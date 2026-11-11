@@ -1006,7 +1006,7 @@ function render(){
 }
 function frame(ts){
   const dt=Math.min(.033,Math.max(0,(ts-lastT)/1000));lastT=ts;
-  PDT=paused?0:dt;CLK+=PDT;ptUpdate(PDT);step(dt);render();musicTick();requestAnimationFrame(frame);
+  PDT=paused?0:dt;CLK+=PDT;ptUpdate(PDT);step(dt);render();musicTick();if(window.touchTick)touchTick();requestAnimationFrame(frame);
 }
 /* ================= v3 : habillage graphique et sonore ================= */
 let PDT=0,CLK=0,SHK=0,BUS=null,MBUS=null;
@@ -2139,6 +2139,56 @@ function bigPlane(L,S,col,eng){return layer(L+20,S+20,g=>{g.translate((L+20)/2,(
       const sec=Math.round(ang/(Math.PI/4))*Math.PI/4,qx=Math.round(Math.cos(sec)),qy=Math.round(Math.sin(sec));
       o.left=qx<0;o.right=qx>0;o.up=qy<0;o.down=qy>0;return o}
   };
+})();
+
+/* ================= commandes tactiles (téléphone, solo contre l'ordi) ================= */
+const TOUCH=(()=>{try{return matchMedia('(pointer:coarse)').matches&&navigator.maxTouchPoints>0}catch(e){return false}})();
+const touchMode=()=>TOUCH&&padCount===0;
+(function(){
+  if(!TOUCH)return;
+  let fresh=true;try{fresh=!localStorage.getItem(KEY)&&!localStorage.getItem(OLDKEY)}catch(e){}
+  if(fresh)cfg.players.forEach((p,i)=>{p.on=i===0});
+  const st=document.createElement('style');
+  st.textContent='body{overscroll-behavior:none}canvas{touch-action:none}'+
+    '#tc{position:fixed;inset:0;display:none;pointer-events:none;z-index:5;touch-action:none;user-select:none;-webkit-user-select:none}#tc.on{display:block}'+
+    '#tpad{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:16px;width:min(170px,42vh);height:min(170px,42vh);border-radius:50%;background:rgba(255,255,255,.10);border:2px solid rgba(255,255,255,.3);pointer-events:auto;touch-action:none}'+
+    '#tknob{position:absolute;left:50%;top:50%;width:38%;height:38%;margin:-19% 0 0 -19%;border-radius:50%;background:rgba(255,255,255,.38);pointer-events:none}'+
+    '#tbtn{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:16px;width:196px;height:min(170px,42vh)}'+
+    '#tA,#tB{position:absolute;width:min(88px,22vh);height:min(88px,22vh);padding:0;border-radius:50%;pointer-events:auto;touch-action:none;font-size:24px;font-weight:800;color:#fff;border:2px solid rgba(255,255,255,.45)}'+
+    '#tA{right:0;bottom:0;background:rgba(57,211,255,.32)}#tB{right:100px;bottom:34%;background:rgba(255,210,63,.3)}#tA.dn,#tB.dn{background:rgba(255,255,255,.6);color:#07081a}'+
+    '@media(orientation:portrait){#stage{align-items:flex-start;padding-top:8px}#tpad,#tbtn{bottom:12vh}}';
+  document.head.appendChild(st);
+  document.body.insertAdjacentHTML('beforeend','<div id="tc"><div id="tpad"><div id="tknob"></div></div><div id="tbtn"><button id="tB" aria-label="Second bouton">B</button><button id="tA" aria-label="Bouton principal">A</button></div></div>');
+  const tc=$('#tc'),pad=$('#tpad'),knob=$('#tknob'),DK={left:'KeyA',right:'KeyD',up:'KeyW',down:'KeyS'};
+  let pid=null;
+  const clearPad=()=>{pid=null;for(const k in DK)keys[DK[k]]=false;knob.style.transform=''};
+  const setPad=e=>{const r=pad.getBoundingClientRect(),dx=e.clientX-(r.left+r.width/2),dy=e.clientY-(r.top+r.height/2),d=Math.hypot(dx,dy),on=d>r.width*.1;
+    keys.KeyA=on&&dx<-d*.38;keys.KeyD=on&&dx>d*.38;keys.KeyW=on&&dy<-d*.38;keys.KeyS=on&&dy>d*.38;
+    const m=Math.min(d,r.width*.3)/(d||1);knob.style.transform='translate('+dx*m+'px,'+dy*m+'px)'};
+  pad.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();pid=e.pointerId;try{pad.setPointerCapture(pid)}catch(_){}setPad(e)});
+  pad.addEventListener('pointermove',e=>{if(e.pointerId===pid){e.preventDefault();setPad(e)}});
+  for(const ev of['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(ev,e=>{if(e.pointerId===pid)clearPad()});
+  const bind=(el,code)=>{const up=()=>{keys[code]=false;el.classList.remove('dn')};
+    el.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();keys[code]=true;el.classList.add('dn');try{el.setPointerCapture(e.pointerId)}catch(_){}try{navigator.vibrate&&navigator.vibrate(8)}catch(_){}});
+    for(const ev of['pointerup','pointercancel','lostpointercapture'])el.addEventListener(ev,up);
+    el.addEventListener('contextmenu',e=>e.preventDefault())};
+  bind($('#tA'),'Space');bind($('#tB'),'KeyG');
+  tc.addEventListener('contextmenu',e=>e.preventDefault());
+  let shown=false;
+  window.touchTick=function(){const on=touchMode()&&phase==='play'&&!paused&&!!M&&M.b===CPU;
+    if(on!==shown){shown=on;tc.classList.toggle('on',on);if(!on){clearPad();keys.Space=false;keys.KeyG=false;$('#tA').classList.remove('dn');$('#tB').classList.remove('dn')}}};
+  // solo contre l'ordi uniquement
+  const sm0=startMatch,rp0=renderPick,st0=startTournament,ps0=padStatus;
+  startMatch=function(d,free){if(touchMode()&&d.b!==CPU){d={a:d.a,b:CPU,g:d.g};if(F)F.b=CPU}
+    sm0(d,free);
+    if(touchMode())try{const el=document.documentElement;if(!document.fullscreenElement&&el.requestFullscreen){const p=el.requestFullscreen();if(p&&p.then)p.then(()=>{try{const q=screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape');if(q&&q.catch)q.catch(()=>{})}catch(_){}}).catch(()=>{})}}catch(_){}};
+  renderPick=function(keep){if(touchMode()&&F)F.b=CPU;rp0(keep);
+    if(touchMode()){document.querySelectorAll('#panelBody [data-act="R"]').forEach(b=>{if(b.dataset.v!==CPU)b.remove()});navInit()}};
+  startTournament=function(){if(touchMode()&&humans().length>1){$('#err').textContent='Sur téléphone, le tournoi se joue seul contre l\'ordi : ne coche qu\'un joueur.';return}st0()};
+  $('#start').onclick=()=>startTournament();
+  padStatus=function(){if(!touchMode()){ps0();return}
+    const t='<b>Téléphone détecté.</b> Commandes tactiles à l\'écran, en solo contre l\'ordi : croix à gauche, A pour le bouton principal, B pour le second bouton. Tiens le téléphone à l\'horizontale.';
+    if(padTxt!==t){padTxt=t;$('#pads').innerHTML=t}};
 })();
 
 load();renderSetup();requestAnimationFrame(frame);
