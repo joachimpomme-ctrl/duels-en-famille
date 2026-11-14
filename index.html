@@ -1579,7 +1579,7 @@ function jetSprite(col,sil){return layer(64,52,g=>{g.translate(32,26);const dark
 })}
 const JETS=COL.map(c=>jetSprite(c,false)),JETSH=jetSprite('#000000',true);
 (function(){
-  const G=GAMES.plane,r0=G.reset,h0=G.hurt,b0=G.bot;
+  const G=GAMES.plane,r0=G.reset,h0=G.hurt,b0=G.bot,EDG=26;
   PL.mis={c:'#ff5a36',s:'M'};
   G.rule='Pousse la croix dans la direction voulue, l\'avion vire. Pousse à l\'opposé de ta route : demi-tour éclair, pour faire face à celui qui te suit. Bouton principal pour tirer, second bouton pour la postcombustion. Bonus : tir triple, bouclier, réparation, missiles à tête chercheuse (les nuages les sèment). Trois touches et l\'avion tombe. Après 30 secondes, mort subite.';
   G.reset=function(m){r0.call(this,m);PT.length=0;const s=m.S;s.rg=[];s.ms=[];s.sd=false;s.sdT=0;s.itT=2+Math.random()*2;
@@ -1612,7 +1612,7 @@ const JETS=COL.map(c=>jetSprite(c,false)),JETSH=jetSprite('#000000',true);
       p.fuel=p.bz?Math.max(0,p.fuel-dt/1.8):Math.min(1,p.fuel+dt/6);
       const v=(p.bz?380:215)*(p.flip>0?.45:1),cs=Math.cos(p.a),sn=Math.sin(p.a);
       p.x+=cs*v*dt;p.y+=sn*v*dt;
-      if(p.x<0)p.x+=W;if(p.x>W)p.x-=W;if(p.y<PY)p.y+=PH;if(p.y>H)p.y-=PH;
+      if(p.x<-EDG)p.x+=W+2*EDG;if(p.x>W+EDG)p.x-=W+2*EDG;if(p.y<PY-EDG)p.y+=PH+2*EDG;if(p.y>H+EDG)p.y-=PH+2*EDG;
       p.cd-=dt;p.inv-=dt;p.tri-=dt;
       if(I.x&&p.cd<=0&&p.flip<=0&&p.hp>0){
         if(p.mis>0){p.mis--;p.cd=.5;s.ms.push({x:p.x+cs*22,y:p.y+sn*22,a:p.a,o:i,l:2.4});SFX.fire()}
@@ -1631,11 +1631,11 @@ const JETS=COL.map(c=>jetSprite(c,false)),JETSH=jetSprite('#000000',true);
         if(Math.abs(d)<.45){const na=ba+clamp(d,-1.3*dt,1.3*dt);b.vx=Math.cos(na)*580;b.vy=Math.sin(na)*580}}
       b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt;
       if(b.l>0&&p.inv<=0&&p.hp>0&&Math.hypot(b.x-p.x,b.y-p.y)<17){b.l=0;this.hurt(s,1-b.o)}}
-    s.bl=s.bl.filter(b=>b.l>0&&b.x>0&&b.x<W&&b.y>PY&&b.y<H);
+    s.bl=s.bl.filter(b=>b.l>0&&b.x>-EDG&&b.x<W+EDG&&b.y>PY-EDG&&b.y<H+EDG);
     for(const q of s.ms){const t=s.p[1-q.o],hid=s.cl.some(c=>Math.hypot(t.x-c.x,t.y-c.y)<c.r);
       if(!hid&&t.hp>0)q.a+=clamp(wrapA(Math.atan2(t.y-q.y,t.x-q.x)-q.a),-2.7*dt,2.7*dt);
       q.x+=Math.cos(q.a)*430*dt;q.y+=Math.sin(q.a)*430*dt;q.l-=dt;
-      if(q.x<0)q.x+=W;if(q.x>W)q.x-=W;if(q.y<PY)q.y+=PH;if(q.y>H)q.y-=PH;
+      if(q.x<-EDG)q.x+=W+2*EDG;if(q.x>W+EDG)q.x-=W+2*EDG;if(q.y<PY-EDG)q.y+=PH+2*EDG;if(q.y>H+EDG)q.y-=PH+2*EDG;
       part(q.x-Math.cos(q.a)*10,q.y-Math.sin(q.a)*10,(Math.random()-.5)*20,(Math.random()-.5)*20,.55,3,'rgba(235,235,245,.55)',{grow:9});
       if(t.hp>0&&t.inv<=0&&Math.hypot(q.x-t.x,q.y-t.y)<21){q.l=0;burst(q.x,q.y,22,260,.5,5,['#fff','#ffe08a','#ff9f43'],{add:true,layer:1,drag:2});SFX.thud();this.hurt(s,1-q.o)}
       else if(q.l<=0)burst(q.x,q.y,10,120,.5,5,['rgba(200,200,210,.5)'],{layer:1,grow:10})}
@@ -1659,7 +1659,7 @@ const JETS=COL.map(c=>jetSprite(c,false)),JETSH=jetSprite('#000000',true);
     if(s.it){const it=s.it,K=PL[it.k],r=17+2*Math.sin(it.t*6);glow(it.x,it.y,r+26,K.c,.7);
       ctx.save();ctx.translate(it.x,it.y);ctx.rotate(it.t*1.5);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.setLineDash([8,7]);ctx.beginPath();ctx.arc(0,0,r+7,0,7);ctx.stroke();ctx.setLineDash([]);ctx.restore();
       disc(it.x,it.y,r+3,'#07081a');disc(it.x,it.y,r,K.c);disc(it.x-r*.3,it.y-r*.35,r*.3,'rgba(255,255,255,.45)');text(K.s,it.x,it.y+1,22,'#07081a')}
-    const each=(p,fn)=>{for(const ox of[0,p.x<34?W:p.x>W-34?-W:null])if(ox!==null)for(const oy of[0,p.y<PY+34?PH:p.y>H-34?-PH:null])if(oy!==null)fn(p.x+ox,p.y+oy)};
+    const each=(p,fn)=>fn(p.x,p.y);
     s.p.forEach(p=>{if(p.hp<=0)return;each(p,(x,y)=>{ctx.save();ctx.translate(x+16,y+24);ctx.rotate(p.a);ctx.globalAlpha=.26;ctx.drawImage(JETSH,-27,-22,54,44);ctx.restore()})});
     ctx.globalAlpha=1;ptDraw(0);
     for(const b of s.bl){const l=Math.hypot(b.vx,b.vy)||1,ux=b.vx/l,uy=b.vy/l;glow(b.x,b.y,13,COL[b.o],.9);
@@ -2469,7 +2469,7 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
 /* ================= TRAÎNÉES : motos de lumière ================= */
 (function(){
   const G=GAMES.tron,bot0=G.bot,C=68,R=35,c=14,ox=4,TK=.075,WH=5,
-    LAY=[[],[[20,8,3,3],[20,24,3,3]],[[33,4,2,9],[33,22,2,9]],[[28,10,2,2],[28,23,2,2],[33,15,2,5]],[[14,16,6,2],[26,6,2,6],[26,23,2,6]]],
+    LAY=[[],[[20,8,3,3],[20,24,3,3]],[[33,4,2,9],[33,22,2,9]],[[28,10,2,2],[28,23,2,2],[33,15,2,5]],[[14,9,6,2],[14,24,6,2],[26,6,2,6],[26,23,2,6]]],
     LN=['Arène ouverte','Les quatre piliers','La porte','Le labyrinthe','Les barrages'],
     IT={era:{c:GREEN,n:'Traînée effacée'},slo:{c:'#8fd8ff',n:'Adversaire ralenti'},bom:{c:ORANGE,n:'Bombe'}},IK=Object.keys(IT),
     D={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]},
@@ -2509,6 +2509,8 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
       Object.assign(s,{C,R,g:new Uint8Array(C*R),ly:m.ly,acc:0,tick:0,t:0,lp:null,bz:[0,0],bcd:[1,1],tl:[[],[]],it:null,itT:3+Math.random()*2,ring:0,nr:16,warn:false,dead:null,fl:null,n:{jump:0,turbo:0,it:0,ring:0},
         p:[0,1].map(i=>({x:i?55:12,y:17,dx:i?-1:1,dy:0,nx:i?-1:1,ny:0,j:0,jcd:1.5,jz:0,slow:0,shd:AID(i),rx:ox+(i?55:12)*c+7,ry:PY+17*c+7,ra:i?Math.PI:0}))});
       for(const q of LAY[m.ly])for(let y=q[1];y<q[1]+q[3];y++)for(let x=q[0];x<q[0]+q[2];x++){s.g[y*C+x]=3;s.g[y*C+(C-1-x)]=3}
+      /* garde-fou : jamais de bloc dans le couloir de départ, 16 cases devant chaque moto */
+      for(const p of s.p)for(let k=0;k<=16;k++)for(let dy=-1;dy<=1;dy++)s.g[(p.y+dy)*C+p.x+k*p.dx]=0;
       s.p.forEach((p,i)=>{s.g[p.y*C+p.x]=i+1;s.tl[i].push(p.y*C+p.x)})},
     update(m,dt){const s=m.S;s.t+=dt;if(s.fl)s.fl.t-=dt;
       for(let i=0;i<2;i++){const p=s.p[i],I=inp[i];let d=null;
@@ -2650,7 +2652,7 @@ function bigPlane(L,S,col,eng){return layer(L+20,S+20,g=>{g.translate((L+20)/2,(
         if(I.p.b&&p.fuel>.1)SFX.boost();
         p.bz=I.b&&p.fuel>.02&&p.flip<=0;p.fuel=p.bz?Math.max(0,p.fuel-dt/1.8):Math.min(1,p.fuel+dt/5);
         const v=(p.bz?390:225)*(p.flip>0?.45:1),cs=Math.cos(p.a),sn=Math.sin(p.a);
-        p.x+=cs*v*dt;p.y+=sn*v*dt;if(p.x<0)p.x+=W;if(p.x>W)p.x-=W;if(p.y<PY)p.y+=PH;if(p.y>H)p.y-=PH;
+        p.x+=cs*v*dt;p.y+=sn*v*dt;if(p.x<-26)p.x+=W+52;if(p.x>W+26)p.x-=W+52;if(p.y<PY-26)p.y+=PH+52;if(p.y>H+26)p.y-=PH+52;
         p.cd-=dt;p.inv-=dt;p.tri-=dt;
         if(I.x&&p.cd<=0&&p.flip<=0){
           if(p.mis>0){p.mis--;p.cd=.45;s.ms.push({x:p.x+cs*22,y:p.y+sn*22,a:p.a,o:i,l:2.6});SFX.fire()}
@@ -2664,7 +2666,7 @@ function bigPlane(L,S,col,eng){return layer(L+20,S+20,g=>{g.translate((L+20)/2,(
       // tirs des joueurs
       for(const b of s.bl){b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt;if(b.l<=0)continue;
         for(const e of s.en)if(!e.gone&&hitE(e,b.x,b.y,4)){b.l=0;part(b.x,b.y,0,0,.12,7,'#fff',{add:true,layer:1});dmg(s,e,1,b.o);break}}
-      s.bl=s.bl.filter(b=>b.l>0&&b.x>-10&&b.x<W+10&&b.y>PY-10&&b.y<H+10);
+      s.bl=s.bl.filter(b=>b.l>0&&b.x>-30&&b.x<W+30&&b.y>PY-30&&b.y<H+30);
       for(const q of s.ms){let tg=null,bd=1e9;for(const e of s.en)if(!e.gone){const d=Math.hypot(e.x-q.x,e.y-q.y);if(d<bd){bd=d;tg=e}}
         if(tg)q.a+=clamp(wrapA(Math.atan2(tg.y-q.y,tg.x-q.x)-q.a),-3.2*dt,3.2*dt);
         q.x+=Math.cos(q.a)*450*dt;q.y+=Math.sin(q.a)*450*dt;q.l-=dt;
