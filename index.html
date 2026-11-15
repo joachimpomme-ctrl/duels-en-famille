@@ -201,8 +201,8 @@ function readSide(k,g){
 function poll(){
   let pads=[];
   try{pads=Array.from(navigator.getGamepads?navigator.getGamepads():[]).filter(g=>g&&g.connected);padErr=false}catch(e){padErr=true}
-  padCount=pads.length;
-  const raw=[readSide(KM[0],pads[0]),readSide(KM[1],pads[1])];
+  padCount=pads.length;pads=padSlots(pads);
+  const raw=[padRead(0,pads[0]),padRead(1,pads[1])];
   const vs=!!M&&phase==='play'&&M.b===CPU;
   for(let i=0;i<2;i++){
     let n=raw[i];
@@ -1006,7 +1006,7 @@ function render(){
 }
 function frame(ts){
   const dt=Math.min(.033,Math.max(0,(ts-lastT)/1000));lastT=ts;
-  PDT=paused?0:dt;CLK+=PDT;ptUpdate(PDT);step(dt);render();if(window.ccTick)ccTick();musicTick();if(window.touchTick)touchTick();requestAnimationFrame(frame);
+  PDT=paused?0:dt;CLK+=PDT;ptUpdate(PDT);step(dt);render();if(window.ccTick)ccTick();musicTick();if(window.touchTick)touchTick();padWatch();requestAnimationFrame(frame);
 }
 /* ================= v3 : habillage graphique et sonore ================= */
 let PDT=0,CLK=0,SHK=0,BUS=null,MBUS=null;
@@ -3054,8 +3054,9 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
     move(s,p,i,dx,dy,dist){let mv=0;const H=dx!==0,dd=H?dx:dy;let a=H?p.x:p.y,o=H?p.y:p.x;
       const sol=(u,v)=>H?this.solid(s,u,v,i):this.solid(s,v,u,i);
       let lane=Math.round(o);
-      if(Math.abs(o-lane)>1e-4){const base=Math.round(a);
-        if(sol(base+dd,lane)){const l2=o>lane?lane+1:lane-1;if(sol(base+dd,l2)||sol(base,l2))return 0;lane=l2}
+      if(Math.abs(o-lane)>1e-4){const base=Math.round(a),fw=p.md>=0?DIR[p.md][H?1:0]:0;
+        /* couloir le plus proche s'il est ouvert ; sinon l'autre, mais seulement s'il est devant nous (jamais de marche arrière surprise) */
+        if(sol(base+dd,lane)){const l2=o>lane?lane+1:lane-1;if(sol(base+dd,l2)||sol(base,l2)||(fw&&Math.sign(l2-o)!==fw))return 0;lane=l2}
         const st=Math.min(dist,Math.abs(lane-o));o+=Math.sign(lane-o)*st;dist-=st;mv+=st;if(Math.abs(lane-o)<1e-4)o=lane;
         if(H)p.y=o;else p.x=o;if(o!==lane||dist<=0)return mv}
       else o=lane;
@@ -3081,8 +3082,10 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
         let d=-1;if(p.ld>=0&&I[DK[p.ld]])d=p.ld;else for(let k=0;k<4;k++)if(I[DK[k]]){d=k;break}
         let q=idx(Math.round(p.x),Math.round(p.y)),tr=s.tr[q],sp=4+p.sp*.5,mv=0;
         if(tr===1){sp*=1.2;if(d<0)d=p.md}
-        if(d>=0){mv=this.move(s,p,i,DIR[d][0],DIR[d][1],sp*dt);
+        if(d>=0){const pm=p.md;mv=this.move(s,p,i,DIR[d][0],DIR[d][1],sp*dt);
           if(mv<1e-5)for(let k=0;k<4&&mv<1e-5;k++)if(k!==d&&I[DK[k]]){const m2=this.move(s,p,i,DIR[k][0],DIR[k][1],sp*dt);if(m2>1e-5){mv=m2;d=k}}
+          /* virage demandé trop tôt : le joueur continue sur sa lancée et tournera au prochain croisement (joueurs humains seulement) */
+          if(mv<1e-5&&pm>=0&&pm!==d&&(pm+d)%2===1&&!(i===1&&m.b===CPU)){const m2=this.move(s,p,i,DIR[pm][0],DIR[pm][1],sp*dt);if(m2>1e-5){mv=m2;d=pm}}
           p.d=d}
         p.mv=mv>1e-5;p.md=p.mv?d:-1;if(p.mv)p.an+=dt;
         if(tr>=2&&tr<=5){const b=DIR[tr-2];this.move(s,p,i,b[0],b[1],1.3*dt)}
@@ -4567,6 +4570,47 @@ function bigPlane(L,S,col,eng){return layer(L+20,S+20,g=>{g.translate((L+20)/2,(
     text(tch?'Touche A pour commencer':kb?'Clavier : bouton principal = Espace ou Entrée, second bouton = G ou L':'Essayez vos boutons : la ligne qui s\'allume dit à quoi ils servent',W/2,H-16,13,'#9aa0d0');
     ctx.restore()};
 })();
+
+/* ================= manettes : places fixes ================= */
+/* Avant : la liste des manettes était recompactée à chaque image. Si la manette de gauche décrochait un instant, celle de droite prenait sa place et pilotait l'autre joueur. */
+const PSL=[null,null];
+function padSlots(list){const now=performance.now(),live={};for(const g of list)live[g.index]=g;
+  for(const k of Object.keys(live).map(Number).sort((a,b)=>a-b)){if((PSL[0]&&PSL[0].idx===k)||(PSL[1]&&PSL[1].idx===k))continue;
+    let f=-1;for(let i=0;i<2&&f<0;i++)if(!PSL[i])f=i;for(let i=0;i<2&&f<0;i++)if(!live[PSL[i].idx])f=i;
+    if(f>=0)PSL[f]={idx:k,seen:now,last:null,lost:0,warn:false}}
+  for(let i=0;i<2;i++){const s=PSL[i];if(!s)continue;if(live[s.idx]){s.seen=now;s.lost=0;s.warn=false}else s.lost=now-s.seen}
+  if(phase!=='play'){for(let i=0;i<2;i++)if(PSL[i]&&PSL[i].lost>4000)PSL[i]=null;if(!PSL[0]&&PSL[1]){PSL[0]=PSL[1];PSL[1]=null}}
+  return[0,1].map(i=>(PSL[i]&&live[PSL[i].idx])||null)}
+function padRead(i,g){const s=PSL[i];if(g){const r=readSide(KM[i],g);if(s){s.last=r;const k=readSide(KM[i],null);if(BT.some(q=>r[q]&&!k[q]))s.act=performance.now()}return r}
+  const k=readSide(KM[i],null);if(s&&s.last&&s.lost<220){const r={};for(const q of BT)r[q]=s.last[q]||k[q];return r}   /* micro-coupure : on garde le dernier état */
+  return k}
+/* écran d'accueil : savoir quelle manette est laquelle, et pouvoir les échanger */
+let padKey='';
+function padUI(){let box=document.getElementById('padui');
+  if(!box){const host=document.querySelector('#setup .sub')||document.getElementById('pads');if(!host)return;   /* tout en haut de l'accueil, visible sans défiler */
+    const st=document.createElement('style');st.textContent='#padui{display:flex;gap:12px;align-items:stretch;justify-content:flex-start;margin:14px 0 4px;flex-wrap:wrap}'
+      +'#padui .pc{min-width:220px;padding:9px 16px;border-radius:14px;border:2px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);text-align:left;transition:transform .08s,background .08s;opacity:.55}'
+      +'#padui .pc b{display:block;font-size:16px}#padui .pc span{display:block;font-size:12px;opacity:.8}#padui .pc em{display:block;font-style:normal;font-size:12px;margin-top:3px;opacity:.85}'
+      +'#padui .pc.on{opacity:1}#padui #pc0.on{border-color:'+COL[0]+'}#padui #pc1.on{border-color:'+COL[1]+'}#padui #pc0.on b{color:'+COL[0]+'}#padui #pc1.on b{color:'+COL[1]+'}'
+      +'#padui .pc.act{transform:scale(1.06)}#padui #pc0.act{background:'+COL[0]+'}#padui #pc1.act{background:'+COL[1]+'}#padui #pc0.act b,#padui #pc1.act b,#padui .pc.act span,#padui .pc.act em{color:#07081a;opacity:1}'
+      +'#padui #pswap{align-self:center;padding:8px 14px;border-radius:999px;font-weight:700}';document.head.appendChild(st);
+    box=document.createElement('div');box.id='padui';box.innerHTML='<div class="pc" id="pc0"></div><button id="pswap" type="button">⇄ Échanger</button><div class="pc" id="pc1"></div>';
+    host.parentNode.insertBefore(box,host.nextSibling);
+    document.getElementById('pswap').onclick=()=>{const t=PSL[0];PSL[0]=PSL[1];PSL[1]=t;padKey='';try{SFX.click()}catch(e){}}}
+  const now=performance.now(),S=[0,1].map(i=>{const s=PSL[i];return!s||s.lost>0?0:(s.act&&now-s.act<450?2:1)}),key=S.join('')+(PSL[0]?PSL[0].idx:'-')+(PSL[1]?PSL[1].idx:'-');
+  if(key===padKey)return;padKey=key;box.style.display=S[0]||S[1]?'':'none';document.getElementById('pswap').style.display=S[0]&&S[1]?'':'none';
+  for(let i=0;i<2;i++){const e=document.getElementById('pc'+i);e.className='pc'+(S[i]?' on':'')+(S[i]===2?' act':'');
+    e.innerHTML='<b>Manette '+(i+1)+'</b><span>'+(i?'joueur de droite, en jaune':'joueur de gauche, en bleu')+'</span><em>'+(S[i]===2?'C\'est celle-ci !':S[i]?'Appuie sur un bouton pour la repérer':'pas encore reconnue : appuie sur un de ses boutons')+'</em>'}}
+/* manette perdue en plein match : pause automatique et message clair */
+function padWatch(){const el=document.getElementById('padmsg');
+  if(phase==='setup')padUI();
+  if(phase!=='play'||!M){if(el)el.textContent='';return}
+  let lost=-1;for(let i=0;i<2;i++)if(PSL[i]&&PSL[i].lost>900)lost=i;
+  if(lost<0){if(el&&!paused)el.textContent='';return}
+  const s=PSL[lost];if(s.warn)return;s.warn=true;
+  let e=el;if(!e){const pz=document.querySelector('#pause .actions');if(pz){e=document.createElement('p');e.id='padmsg';e.style.cssText='color:#ffd27a;font-weight:700;margin:0 0 14px;max-width:440px';pz.parentNode.insertBefore(e,pz)}}
+  if(e)e.textContent='La manette '+(lost+1)+' ne répond plus. Appuie sur un de ses boutons pour la réveiller, puis reprends la partie.';
+  if(!paused)togglePause()}
 
 /* ================= coup de pouce, palmarès, fin de tournoi ================= */
 (function(){
