@@ -1142,8 +1142,8 @@ const RC2=ctx,TX2=text;
 const GX=(function(){
   const TAU=6.283185307,FONT='px "Avenir Next","Trebuchet MS",system-ui,sans-serif';
   let gl=null,cvs=null,prog=null,vbo=null,vao=null,uR=null,uI=null,lost=false;
-  let cap=1<<16,AB=new ArrayBuffer(cap*28),F=new Float32Array(AB),U=new Uint32Array(AB),n=0;
-  let rg=[],cur=null,sc=null,pl=null,PS=2,ATL=null,WH=null,GT=null,S1x=0,S1w=1,S1y=0,S1q=1,S2x=0,S2w=1,S2y=0,S2q=1,SV1=0,SV2=1;
+  let cap=1<<16,AB=new ArrayBuffer(cap*32),F=new Float32Array(AB),U=new Uint32Array(AB),n=0;
+  let rg=[],cur=null,sc=null,pl=null,PS=2,ATL=null,WH=null,GT=null,S1x=0,S1w=1,S1y=0,S1q=1,S2x=0,S2w=1,S2y=0,S2q=1,SV1=0,SV2=1,SO=0,lt=null,UL=null;
   const reg=new Map(),cols=new Map(),txt=new Map(),stk=[];
   let m=[1,0,0,1,0,0],subs=[],sp=null,stx=0,sty=0,pc=null;
   const o={ok:false,dead:false,why:'',draws:0,verts:0,want:true,tag:0,first:true,atl:null,tex:false,lite:false};
@@ -1160,21 +1160,21 @@ const GX=(function(){
   /* couleur empaquetée, alpha prémultiplié. En mode additif (« lighter »), l'alpha écrit vaut zéro : la même loi de mélange ajoute alors la couleur au fond. */
   const pk=(r,g,b,a,add)=>((add?0:Math.round(a*255))<<24|Math.round(b*a)<<16|Math.round(g*a)<<8|Math.round(r*a))>>>0;
   const add=()=>c.globalCompositeOperation==='lighter';
-  const colOf=s=>{const q=rgba(s);return pk(q[0],q[1],q[2],q[3]*c.globalAlpha,add())};
+  const colOf=s=>{const q=rgba(s),t=c.tint;return pk(q[0]*t,q[1]*t,q[2]*t,q[3]*c.globalAlpha,add())};
   function grad(x0,y0,x1,y1){const st=[];return{g:1,x0,y0,dx:x1-x0,dy:y1-y0,st,addColorStop(t,col){st.push([t,rgba(col)]);st.sort((a,b)=>a[0]-b[0])}}}
-  function gcolT(G,t){const s=G.st,al=c.globalAlpha,ad=add();if(!s.length)return 0;let a=s[0],b=s[s.length-1];
-    if(t<=a[0])return pk(a[1][0],a[1][1],a[1][2],a[1][3]*al,ad);if(t>=b[0])return pk(b[1][0],b[1][1],b[1][2],b[1][3]*al,ad);
+  function gcolT(G,t){const s=G.st,al=c.globalAlpha,ad=add(),m=c.tint;if(!s.length)return 0;let a=s[0],b=s[s.length-1];
+    if(t<=a[0])return pk(a[1][0]*m,a[1][1]*m,a[1][2]*m,a[1][3]*al,ad);if(t>=b[0])return pk(b[1][0]*m,b[1][1]*m,b[1][2]*m,b[1][3]*al,ad);
     for(let i=1;i<s.length;i++)if(t<=s[i][0]){a=s[i-1];b=s[i];break}
-    const u=(t-a[0])/((b[0]-a[0])||1),p=a[1],q=b[1];return pk(p[0]+(q[0]-p[0])*u,p[1]+(q[1]-p[1])*u,p[2]+(q[2]-p[2])*u,(p[3]+(q[3]-p[3])*u)*al,ad)}
+    const u=(t-a[0])/((b[0]-a[0])||1),p=a[1],q=b[1];return pk((p[0]+(q[0]-p[0])*u)*m,(p[1]+(q[1]-p[1])*u)*m,(p[2]+(q[2]-p[2])*u)*m,(p[3]+(q[3]-p[3])*u)*al,ad)}
   const gcol=(G,x,y)=>{const L=G.dx*G.dx+G.dy*G.dy;return gcolT(G,L?((x-G.x0)*G.dx+(y-G.y0)*G.dy)/L:0)};
   const lerpC=(a,b,t)=>{const f=s=>Math.round((a>>>s&255)+((b>>>s&255)-(a>>>s&255))*t);return (f(24)<<24|f(16)<<16|f(8)<<8|f(0))>>>0};
 
   /* ----- sommets, triangles, plages de dessin ----- */
-  function grow(){cap*=2;const B=new ArrayBuffer(cap*28),F2=new Float32Array(B);F2.set(F);AB=B;F=F2;U=new Uint32Array(B)}
-  function V(x,y,u,v,k){if(n>=cap)grow();const i=n*7;F[i]=x;F[i+1]=y;F[i+2]=u;F[i+3]=v;F[i+4]=1;F[i+5]=-1;U[i+6]=k;n++}
+  function grow(){cap*=2;const B=new ArrayBuffer(cap*32),F2=new Float32Array(B);F2.set(F);AB=B;F=F2;U=new Uint32Array(B)}
+  function V(x,y,u,v,k){if(n>=cap)grow();const i=n*8;F[i]=x;F[i+1]=y;F[i+2]=u;F[i+3]=v;F[i+4]=1;F[i+5]=-1;F[i+6]=0;U[i+7]=k;n++}
   /* sommet de sol : texture répétée, en perspective (q = échelle à l'écran de ce point de la route) */
-  function VG(x,y,u,v,q,l,k){if(n>=cap)grow();const i=n*7;F[i]=X(x,y);F[i+1]=Y(x,y);F[i+2]=u*q;F[i+3]=v*q;F[i+4]=q;F[i+5]=l;U[i+6]=k;n++}
-  function use(r){if(!cur||cur.r.t!==r.t||cur.sc!==sc){cur={s:n,r,sc};rg.push(cur)}}
+  function VG(x,y,u,v,q,l,k,lat){if(n>=cap)grow();const i=n*8;F[i]=X(x,y);F[i+1]=Y(x,y);F[i+2]=u*q;F[i+3]=v*q;F[i+4]=q;F[i+5]=l;F[i+6]=(lat+SO)*q;U[i+7]=k;n++}
+  function use(r){if(!cur||cur.r.t!==r.t||cur.sc!==sc||cur.lt!==lt){cur={s:n,r,sc,lt};rg.push(cur)}}
   /* un triangle, en coordonnées d'écran. Si un bord de découpe est posé (objet à demi caché par une crête), il est rogné ici. */
   function tri(x0,y0,u0,v0,k0,x1,y1,u1,v1,k1,x2,y2,u2,v2,k2){
     if(!pl){V(x0,y0,u0,v0,k0);V(x1,y1,u1,v1,k1);V(x2,y2,u2,v2,k2);return}
@@ -1247,16 +1247,28 @@ const GX=(function(){
   function setup(){
     const sh=(ty,src)=>{const s=gl.createShader(ty);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)||'shader');return s};
     prog=gl.createProgram();
-    gl.attachShader(prog,sh(gl.VERTEX_SHADER,'#version 300 es\nin vec2 aP;in vec3 aT;in float aL;in vec4 aC;uniform vec2 uR;out vec3 vT;out float vL;out vec4 vC;void main(){vT=aT;vL=aL;vC=aC;gl_Position=vec4(aP.x*uR.x-1.,1.-aP.y*uR.y,0.,1.);}'));
-    gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;precision highp sampler2DArray;uniform sampler2D uS;uniform sampler2DArray uG;uniform vec2 uI;in vec3 vT;in float vL;in vec4 vC;out vec4 o;'+
-      'void main(){vec2 uv=vT.xy/vT.z,dx=dFdx(uv),dy=dFdy(uv);if(vL<-.5){o=textureGrad(uS,uv*uI,dx*uI*.707,dy*uI*.707)*vC;}'+
-      'else{vec3 a=textureGrad(uG,vec3(uv,vL),dx,dy).rgb,b=textureGrad(uG,vec3(uv*5.3,vL),dx*5.3,dy*5.3).rgb;o=vec4(vC.rgb*a*b*4.,vC.a);}}'));
-    gl.bindAttribLocation(prog,0,'aP');gl.bindAttribLocation(prog,1,'aT');gl.bindAttribLocation(prog,2,'aC');gl.bindAttribLocation(prog,3,'aL');gl.linkProgram(prog);
+    gl.attachShader(prog,sh(gl.VERTEX_SHADER,'#version 300 es\nin vec2 aP;in vec3 aT;in float aL;in float aA;in vec4 aC;uniform vec2 uR;out vec3 vT;out float vL;out float vA;out vec2 vP;out vec4 vC;void main(){vT=aT;vL=aL;vA=aA;vP=aP;vC=aC;gl_Position=vec4(aP.x*uR.x-1.,1.-aP.y*uR.y,0.,1.);}'));
+    gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,'#version 300 es\nprecision highp float;precision highp sampler2DArray;uniform sampler2D uS;uniform sampler2DArray uG;uniform vec2 uI;'+
+      'uniform vec2 uK;uniform vec2 uA;uniform vec3 uPc;uniform vec3 uSky;uniform vec2 uSun;uniform int uNb;uniform int uNp;uniform vec4 uB[6];uniform vec4 uP[16];'+
+      'in vec3 vT;in float vL;in float vA;in vec2 vP;in vec4 vC;out vec4 o;'+
+      'void main(){vec2 uv=vT.xy/vT.z,dx=dFdx(uv),dy=dFdy(uv);if(vL<-.5){o=textureGrad(uS,uv*uI,dx*uI*.707,dy*uI*.707)*vC;return;}'+
+      /* sol : texture répétée, puis lumière. lat : position en travers de la route (en demi-largeurs), cz : distance à la caméra */
+      'float q=vT.z,lat=vA/q,cz=uK.x/q;vec3 tint=vC.rgb/max(vC.a,.001),col;'+
+      'if(vL>3.5){float fr=clamp(1.-q*uK.y,0.,1.),s=textureGrad(uG,vec3(uv.x*5.,uv.y*.3,3.),dx*vec2(5.,.3),dy*vec2(5.,.3)).r*2.;'+   /* glace : elle renvoie le ciel, de plus en plus avec la distance, et le soleil en une traînée brillante */
+        'col=mix(tint*(.78+.22*s),uSky,.12+.5*fr);float g=exp(-pow((vP.x-uSun.x)/(20.+70.*(1.-fr)),2.))*(.25+.75*fr);col+=vec3(1.,.96,.84)*g*(.25+.55*s*s);}'+
+      'else{vec3 a=textureGrad(uG,vec3(uv,vL),dx,dy).rgb,b=textureGrad(uG,vec3(uv*5.3,vL),dx*5.3,dy*5.3).rgb;col=tint*a*b*4.;}'+
+      'float L=uA.x;vec3 ad=vec3(0.);'+
+      /* phares : un cône qui part de chaque kart et suit la route */
+      'for(int i=0;i<6;i++){if(i>=uNb)break;vec4 B=uB[i];float dk=cz-B.y,e=.2+max(dk,0.)*.00016;L+=uA.y*B.w*(1.-smoothstep(.4,1.,abs(lat-B.x)/e))*smoothstep(-200.,500.,dk)*exp(-max(dk,0.)/6500.);}'+
+      /* halos au sol : lampadaires, lave */
+      'for(int i=0;i<16;i++){if(i>=uNp)break;vec4 P=uP[i];float I=1.-smoothstep(0.,1.,length(vec2((lat-P.x)*2000.,(cz-P.y)*.7))/P.z);ad+=uPc*(I*I*P.w);}'+
+      'col=col*L+(col*1.4+.13)*ad;o=vec4(col*vC.a,vC.a);}'));
+    gl.bindAttribLocation(prog,0,'aP');gl.bindAttribLocation(prog,1,'aT');gl.bindAttribLocation(prog,2,'aC');gl.bindAttribLocation(prog,3,'aL');gl.bindAttribLocation(prog,4,'aA');gl.linkProgram(prog);
     if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog)||'programme');
-    uR=gl.getUniformLocation(prog,'uR');uI=gl.getUniformLocation(prog,'uI');gl.useProgram(prog);gl.uniform1i(gl.getUniformLocation(prog,'uS'),0);gl.uniform1i(gl.getUniformLocation(prog,'uG'),1);
+    uR=gl.getUniformLocation(prog,'uR');uI=gl.getUniformLocation(prog,'uI');gl.useProgram(prog);gl.uniform1i(gl.getUniformLocation(prog,'uS'),0);gl.uniform1i(gl.getUniformLocation(prog,'uG'),1);UL={};for(const k of['uK','uA','uPc','uSky','uSun','uNb','uNp','uB','uP'])UL[k]=gl.getUniformLocation(prog,k);
     vao=gl.createVertexArray();gl.bindVertexArray(vao);vbo=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,vbo);
-    gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,28,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,8);
-    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,28,20);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.UNSIGNED_BYTE,true,28,24);
+    gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,32,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,32,8);
+    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,32,20);gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,32,24);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.UNSIGNED_BYTE,true,32,28);
     reg.clear();ATL=null;WH=null;GT=null}
   function init(){if(o.dead)return false;if(gl)return o.ok&&!lost;
     try{cvs=document.createElement('canvas');cvs.width=cv.width;cvs.height=cv.height;
@@ -1281,16 +1293,20 @@ const GX=(function(){
     if(cvs.width!==cv.width||cvs.height!==cv.height){cvs.width=cv.width;cvs.height=cv.height}
     PS=cv.width/W;if(!ATL){atlas(list());try{sols()}catch(e){GT=null;try{console.warn('Textures de sol indisponibles :',e&&e.message||e)}catch(_){}}}o.tex=!!GT&&!o.lite;
     n=0;rg.length=0;cur=null;sc=null;pl=null;stk.length=0;subs=[];sp=null;m[0]=1;m[1]=0;m[2]=0;m[3]=1;m[4]=0;m[5]=0;
-    c.fillStyle=c.strokeStyle='#000';c.lineWidth=1;c.globalAlpha=1;c.globalCompositeOperation='source-over';return true};
+    c.fillStyle=c.strokeStyle='#000';c.lineWidth=1;c.globalAlpha=1;c.globalCompositeOperation='source-over';c.tint=1;lt=null;return true};
   /* envoie tout à la carte graphique, puis ouvre la bande de jeu (y, h en unités du jeu) dans le canvas 2D pour laisser voir le monde dessous */
   o.end=function(y,h){const W2=cvs.width,H2=cvs.height;
     gl.viewport(0,0,W2,H2);gl.disable(gl.SCISSOR_TEST);gl.clearColor(.027,.031,.102,1);gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.useProgram(prog);gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,F,gl.STREAM_DRAW,0,n*7);if(GT){gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D_ARRAY,GT)}
+    gl.useProgram(prog);gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,vbo);gl.bufferData(gl.ARRAY_BUFFER,F,gl.STREAM_DRAW,0,n*8);if(GT){gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D_ARRAY,GT)}
     gl.uniform2f(uR,2/W,2/H);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.activeTexture(gl.TEXTURE0);
-    let bt=null,bs=null,k=0;
+    let bt=null,bs=null,bl=0,k=0;
     for(let i=0;i<rg.length;i++){const r=rg[i],e=i+1<rg.length?rg[i+1].s:n;if(e<=r.s)continue;
       if(r.r.t!==bt){bt=r.r.t;gl.bindTexture(gl.TEXTURE_2D,bt);gl.uniform2f(uI,1/r.r.iw,1/r.r.ih)}
       if(r.sc!==bs){bs=r.sc;if(bs){gl.enable(gl.SCISSOR_TEST);gl.scissor(bs[0],H2-bs[1]-bs[3],bs[2],bs[3])}else gl.disable(gl.SCISSOR_TEST)}
+      if(r.lt!==bl){bl=r.lt;const L=bl;
+        if(L){gl.uniform2f(UL.uK,L.K[0],L.K[1]);gl.uniform2f(UL.uA,L.A[0],L.A[1]);gl.uniform3f(UL.uPc,L.pc[0],L.pc[1],L.pc[2]);gl.uniform3f(UL.uSky,L.sky[0],L.sky[1],L.sky[2]);gl.uniform2f(UL.uSun,L.sun[0],L.sun[1]);
+          gl.uniform1i(UL.uNb,L.nb);gl.uniform1i(UL.uNp,L.np);if(L.nb)gl.uniform4fv(UL.uB,L.B);if(L.np)gl.uniform4fv(UL.uP,L.P)}
+        else{gl.uniform2f(UL.uK,1,1);gl.uniform2f(UL.uA,1,0);gl.uniform3f(UL.uSky,1,1,1);gl.uniform2f(UL.uSun,-1e5,0);gl.uniform1i(UL.uNb,0);gl.uniform1i(UL.uNp,0)}}
       gl.drawArrays(gl.TRIANGLES,r.s,e-r.s);k++}
     o.draws=k;o.verts=n;
     gl.flush();RC2.clearRect(0,y,W,h)};
@@ -1298,7 +1314,7 @@ const GX=(function(){
   /* ----- le faux contexte 2D ----- */
   function pt(x,y){if(!sp){sp=[stx,sty];subs.push(sp)}sp.push(x,y)}
   function arcSeg(r){const rd=Math.max(r,.01)*Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]))*PS;return 2*Math.acos(1-Math.min(.9,.22/Math.max(rd,.25)))}
-  const c={fillStyle:'#000',strokeStyle:'#000',lineWidth:1,globalAlpha:1,globalCompositeOperation:'source-over',lineCap:'butt',lineJoin:'miter',font:'',textAlign:'',textBaseline:'',
+  const c={tint:1,fillStyle:'#000',strokeStyle:'#000',lineWidth:1,globalAlpha:1,globalCompositeOperation:'source-over',lineCap:'butt',lineJoin:'miter',font:'',textAlign:'',textBaseline:'',
     save(){stk.push([m[0],m[1],m[2],m[3],m[4],m[5],c.fillStyle,c.strokeStyle,c.lineWidth,c.globalAlpha,c.globalCompositeOperation,pl,sc])},
     restore(){const q=stk.pop();if(!q)return;m[0]=q[0];m[1]=q[1];m[2]=q[2];m[3]=q[3];m[4]=q[4];m[5]=q[5];c.fillStyle=q[6];c.strokeStyle=q[7];c.lineWidth=q[8];c.globalAlpha=q[9];c.globalCompositeOperation=q[10];pl=q[11];sc=q[12]},
     translate(x,y){m[4]+=m[0]*x+m[2]*y;m[5]+=m[1]*x+m[3]*y},
@@ -1346,19 +1362,23 @@ const GX=(function(){
         else quadL(x,y,x+w,y,x+w,y+h,x,y+h,gcol(G,x,y),gcol(G,x+w,y),gcol(G,x+w,y+h),gcol(G,x,y+h))}
       else{const k=colOf(st);quadL(x,y,x+w,y,x+w,y+h,x,y+h,k,k,k,k)}},
     /* tronçon de route courant : centre, demi-largeur, hauteur à l'écran et échelle de ses deux bords (proche, lointain), et sa position le long de la piste */
-    seg(x1,w1,y1,q1,x2,w2,y2,q2,v1,v2){S1x=x1;S1w=w1;S1y=y1;S1q=q1;S2x=x2;S2w=w2;S2y=y2;S2q=q2;SV1=v1;SV2=v2},
+    seg(x1,w1,y1,q1,x2,w2,y2,q2,v1,v2,so){S1x=x1;S1w=w1;S1y=y1;S1q=q1;S2x=x2;S2w=w2;S2y=y2;S2q=q2;SV1=v1;SV2=v2;SO=so||0},
+    /* éclairage de la vue en cours (phares, halos, soleil) : un objet rempli au fil du dessin, lu au moment d'envoyer l'image */
+    lights(L){lt=L||null},
+    /* un point du repère courant, tel qu'il tombe à l'écran */
+    pt(x,y){return[X(x,y),Y(x,y)]},
     /* bande texturée le long du tronçon, entre deux positions en travers de la route (en demi-largeurs), bord proche puis bord lointain */
     strip(la1,lb1,la2,lb2,ua1,ub1,ua2,ub2,col,L){use(WH);const k=colOf(col),xa1=S1x+S1w*la1,xb1=S1x+S1w*lb1,xa2=S2x+S2w*la2,xb2=S2x+S2w*lb2;
-      VG(xa1,S1y,ua1,SV1,S1q,L,k);VG(xb1,S1y,ub1,SV1,S1q,L,k);VG(xb2,S2y,ub2,SV2,S2q,L,k);VG(xa1,S1y,ua1,SV1,S1q,L,k);VG(xb2,S2y,ub2,SV2,S2q,L,k);VG(xa2,S2y,ua2,SV2,S2q,L,k)},
+      VG(xa1,S1y,ua1,SV1,S1q,L,k,la1);VG(xb1,S1y,ub1,SV1,S1q,L,k,lb1);VG(xb2,S2y,ub2,SV2,S2q,L,k,lb2);VG(xa1,S1y,ua1,SV1,S1q,L,k,la1);VG(xb2,S2y,ub2,SV2,S2q,L,k,lb2);VG(xa2,S2y,ua2,SV2,S2q,L,k,la2)},
     /* le sol de part et d'autre, sur toute la largeur de l'écran, du bord lointain jusqu'à la ligne yc */
     ground(yc,col,L){use(WH);const k=colOf(col),t=clamp((yc-S1y)/((S2y-S1y)||-1),0,1),cx=S1x+(S2x-S1x)*t,w=S1w+(S2w-S1w)*t,q=S1q+(S2q-S1q)*t,v=(SV1*S1q+(SV2*S2q-SV1*S1q)*t)/q,xa=-60,xb=W+60,
         ua=(xa-cx)/w*.5,ub=(xb-cx)/w*.5,ua2=(xa-S2x)/S2w*.5,ub2=(xb-S2x)/S2w*.5;
-      VG(xa,yc,ua,v,q,L,k);VG(xb,yc,ub,v,q,L,k);VG(xb,S2y,ub2,SV2,S2q,L,k);VG(xa,yc,ua,v,q,L,k);VG(xb,S2y,ub2,SV2,S2q,L,k);VG(xa,S2y,ua2,SV2,S2q,L,k)},
+      VG(xa,yc,ua,v,q,L,k,ua*2);VG(xb,yc,ub,v,q,L,k,ub*2);VG(xb,S2y,ub2,SV2,S2q,L,k,ub2*2);VG(xa,yc,ua,v,q,L,k,ua*2);VG(xb,S2y,ub2,SV2,S2q,L,k,ub2*2);VG(xa,S2y,ua2,SV2,S2q,L,k,ua2*2)},
     /* quadrilatère plein, sans passer par un tracé : la route en dessine plus de mille par image */
     quad(x1,y1,x2,y2,x3,y3,x4,y4,col){use(WH);const k=colOf(col);quadL(x1,y1,x2,y2,x3,y3,x4,y4,k,k,k,k)},
     drawImage(img,a,b,w,h,e,f,g,i){const r=rec(img);let sx=0,sy=0,sw=r.w,sh=r.h,dx,dy,dw,dh;
       if(e===undefined){dx=a;dy=b;dw=w===undefined?r.w:w;dh=h===undefined?r.h:h}else{sx=a;sy=b;sw=w;sh=h;dx=e;dy=f;dw=g;dh=i}
-      use(r);const al=c.globalAlpha,k=pk(255,255,255,al,add()),u0=r.x+sx,v0=r.y+sy,u1=u0+sw,v1=v0+sh,
+      use(r);const al=c.globalAlpha,k=pk(255*c.tint,255*c.tint,255*c.tint,al,add()),u0=r.x+sx,v0=r.y+sy,u1=u0+sw,v1=v0+sh,
         ax=X(dx,dy),ay=Y(dx,dy),bx=X(dx+dw,dy),by=Y(dx+dw,dy),ex=X(dx+dw,dy+dh),ey=Y(dx+dw,dy+dh),fx=X(dx,dy+dh),fy=Y(dx,dy+dh);
       tri(ax,ay,u0,v0,k,bx,by,u1,v0,k,ex,ey,u1,v1,k);tri(ax,ay,u0,v0,k,ex,ey,u1,v1,k,fx,fy,u0,v1,k)},
     /* texte : dessiné une fois dans une petite image, puis posé comme un décor */
@@ -1494,7 +1514,7 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       setA:['spine','spine','snowman','rock','spine'],setB:['igloo','spine','bill','snowman','igloo'],obs:['cone','snowman'],mob:'peng',
       far:g=>{dsc(g,220,50,24,'#fffbe0');ridge(g,160,152,128,'#b9d3f0',3,5,1.7);ridge(g,160,154,92,'#dcebfb',4,9,.6);g.fillStyle='#ffffff';for(const x of[110,300,470,650,840]){g.beginPath();g.moveTo(x-22,70);g.lineTo(x,42);g.lineTo(x+24,72);g.closePath();g.fill()}},
       near:g=>{ridge(g,90,62,40,'#e4ecfa',4,9,2.4);ridge(g,90,76,22,'#f4f8ff',6,13,.9)}},
-    {name:'Volcan',sky:['#16050a','#8a2414'],fog:'#5a1a12',g:['#3a2622','#33211e'],r:['#2e2a30','#28242a'],ru:['#ff9f43','#2a1a1a'],lane:'#ff6a3d',
+    {name:'Volcan',sky:['#2c1238','#e8622c'],fog:'#7a3020',g:['#5c3c2e','#543628'],r:['#4a444e','#433d47'],ru:['#ff9f43','#2a1a1a'],lane:'#ff6a3d',
       setA:['lrock','dead','lrock','vent','dead'],setB:['vent','lrock','bill','dead','lrock'],obs:['cone','lava'],mob:'lava',
       far:g=>{const R=rng(9);const gr=g.createRadialGradient(480,40,10,480,40,200);gr.addColorStop(0,'rgba(255,150,60,.8)');gr.addColorStop(1,'rgba(255,90,40,0)');g.fillStyle=gr;g.fillRect(250,0,460,160);
         g.fillStyle='#1c0d12';g.beginPath();g.moveTo(240,160);g.lineTo(420,40);g.lineTo(540,40);g.lineTo(720,160);g.closePath();g.fill();g.fillStyle='#ff6a3d';g.beginPath();g.ellipse(480,42,58,7,0,0,7);g.fill();
@@ -1502,6 +1522,7 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
         ridge(g,160,150,70,'#24121a',4,9,2);for(let k=0;k<50;k++){g.fillStyle='rgba(255,'+(120+R()*100|0)+',60,'+(.4+R()*.5)+')';g.fillRect(R()*960,R()*120,2,2)}},
       near:g=>{g.fillStyle='#14080c';g.fillRect(0,64,960,26);for(let x=0;x<960;x+=30){const h=18+((x*53)%34);g.beginPath();g.moveTo(x,66);g.lineTo(x+10,66-h);g.lineTo(x+22,66-h*.5);g.lineTo(x+30,66);g.closePath();g.fill()}}});
   TH.forEach(t=>{t.farI=layer(960,160,t.far);t.nearI=layer(960,90,t.near)});
+  TH[2].pc=[1,.86,.58];TH[4].pc=[1,.4,.1];TH[3].sun=[220,50];   /* couleur des halos au sol ; place du soleil dans le fond, pour son reflet sur la glace */
   TH[2].gl=TH[3].gl=TH[4].gl=3;   /* sable, neige, roche : sol nu, sans brins d'herbe */
   TH[0].amb='dust';TH[1].amb='leaf';TH[2].amb='dust';TH[3].amb='snow';TH[4].amb='ember';TH[2].vis=.15;TH[2].fog='#170e2c';
   /* ----- particularités des circuits : panneaux, manche à air, rocher ----- */
@@ -1813,13 +1834,22 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
     const prj=(p,cx,cz)=>{const sc=CAMD/cz;p.c.z=cz;p.s.sc=sc;p.s.x=vw/2+sc*cx*vw/2;p.s.y=Math.round(hz-sc*(p.w.y-camY)*VF);p.s.w=sc*ROADW*vw/2};
     const f0=th.vis||.4,f1=th.vis?th.vis+.1:.5,f2=th.vis?.6:1,NL=[];
     let maxy=vh+40,x=0,dx=-(base.curve*bp);
-    const DR=Math.round((full?DRAW:112)*Q),TXR=GM&&GX.tex;   /* TXR : sol, route et chemins texturés, en perspective */
+    const DR=Math.round((full?DRAW:112)*Q),TXR=GM&&GX.tex,NT=TXR&&!!th.vis;   /* TXR : sol, route et chemins texturés, en perspective. NT : nuit éclairée par les phares */
+    /* éclairage : phares des karts (B : place en travers, distance, -, force), halos au sol des lampadaires ou de la lave (P : place, distance, rayon, force) */
+    let LT=null;
+    if(TXR){if(!th.skc){const v=parseInt(th.sky[1].slice(1),16);th.skc=[(v>>16)/255,(v>>8&255)/255,(v&255)/255]}
+      LT={K:[CAMD,PLZ/CAMD],A:[NT?.56:1,NT?1.7:0],pc:th.pc||[1,1,1],sky:th.skc,sun:[-1e5,0],nb:0,np:0,B:new Float32Array(24),P:new Float32Array(64)};
+      if(th.sun){let sx=th.sun[0]-((me.sky*.5)%960+960)%960;if(sx<-60)sx+=960;LT.sun=ctx.pt(sx,hz-160+th.sun[1])}
+      ctx.lights(LT)}
+    const sst=(a,b,x)=>{x=clamp((x-a)/(b-a),0,1);return x*x*(3-2*x)},
+      lum=(lat,cz)=>{let L=LT.A[0];for(let i=0;i<LT.nb;i++){const dk=cz-LT.B[i*4+1],e=.2+Math.max(dk,0)*.00016;L+=LT.A[1]*LT.B[i*4+3]*(1-sst(.4,1,Math.abs(lat-LT.B[i*4])/e))*sst(-200,500,dk)*Math.exp(-Math.max(dk,0)/6500)}
+        for(let i=0;i<LT.np;i++){const I=1-sst(0,1,Math.hypot((lat-LT.P[i*4])*2000,(cz-LT.P[i*4+1])*.7)/LT.P[i*4+2]);L+=I*I*LT.P[i*4+3]*.7}return Math.min(1,L)};
     for(let n=0;n<DR;n++){const sg=SQ(n),sh=SHX(n);sg.clip=maxy;sg.fog=n/DR;
       prj(sg.p1,x-camX+sh,n*SEGL-zo);prj(sg.p2,x+dx-camX+sh,(n+1)*SEGL-zo);x+=dx;dx+=sg.curve;
       const p1=sg.p1.s,p2=sg.p2.s;
       if(sg.p1.c.z<=CAMD||p2.y>=p1.y||p2.y>=maxy)continue;
       const y1=Math.min(p1.y,vh+40),y2=p2.y,d=sg.dk;
-      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
+      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20,sh/ROADW);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
       const r1=p1.w/7,r2=p2.w/7;
       if(!sg.dirt){poly(p1.x-p1.w-r1,p1.y,p1.x-p1.w,p1.y,p2.x-p2.w,p2.y,p2.x-p2.w-r2,p2.y,th.ru[d]);poly(p1.x+p1.w+r1,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x+p2.w+r2,p2.y,th.ru[d])}
       if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d],sg.dirt?2:0);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d]);
@@ -1835,22 +1865,30 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
         if(!d){const l1=p1.w/40,l2=p2.w/40;for(const lx of[-1/3,1/3])poly(p1.x+p1.w*lx-l1,p1.y,p1.x+p1.w*lx+l1,p1.y,p2.x+p2.w*lx+l2,p2.y,p2.x+p2.w*lx-l2,p2.y,th.lane)}
         if(sg.pad){const on=(Math.floor(CLK*10)+sg.i)%2;poly(p1.x+p1.w*(sg.padx-.2),p1.y,p1.x+p1.w*(sg.padx+.2),p1.y,p2.x+p2.w*(sg.padx+.2),p2.y,p2.x+p2.w*(sg.padx-.2),p2.y,on?'#ffb347':'#ff6a3d');
           poly(p1.x+p1.w*(sg.padx-.1),p1.y,p1.x+p1.w*(sg.padx+.1),p1.y,p2.x+p2.w*sg.padx,p2.y,p2.x+p2.w*sg.padx,p2.y,'#fff3b0')}}
-      if(sg.ice){poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,d?'rgba(196,232,255,.66)':'rgba(214,241,255,.72)');
+      if(sg.ice){if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,d?'rgba(196,232,255,.82)':'rgba(214,241,255,.86)',4);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,d?'rgba(196,232,255,.66)':'rgba(214,241,255,.72)');
         const lx=((sg.i*37)%100)/100*1.5-.75;poly(p1.x+p1.w*(lx-.05),p1.y,p1.x+p1.w*(lx+.03),p1.y,p2.x+p2.w*(lx+.13),p2.y,p2.x+p2.w*(lx+.05),p2.y,'rgba(255,255,255,.75)')}
       if(sg.fog>f0){ctx.globalAlpha=Math.min(th.vis?.97:.92,Math.pow((sg.fog-f0)/(1-f0),th.vis?1.1:1.6));ctx.fillStyle=th.fog;ctx.fillRect(-60,y2,vw+120,y1-y2);ctx.globalAlpha=1}
       maxy=y2;
     }
-    for(let n=DR-1;n>=0;n--){const sg=SQ(n);if(sg.p1.c.z<=CAMD)continue;const p1=sg.p1.s,p2=sg.p2.s,fa=sg.fog>f1?Math.max(0,1-(sg.fog-f1)/(f2-f1)):1;
+    if(LT&&(NT||th.pc))for(let n=0;n<DR;n++){const sg=SQ(n);if(sg.p1.c.z<=CAMD)continue;const so=SHX(n)/ROADW,zz=o=>mix(sg.p1.c.z,sg.p2.c.z,o.pct),pool=(x,z,r,w)=>{if(LT.np<16){const k=LT.np++*4;LT.P[k]=x;LT.P[k+1]=z;LT.P[k+2]=r;LT.P[k+3]=w}};
+      if(NT){for(const o of sg.dyn)if(o.t==='k'&&LT.nb<6){const k=LT.nb++*4;LT.B[k]=o.x+so;LT.B[k+1]=zz(o);LT.B[k+3]=o.c===me?1:.7}
+        if(sg.fog<.9)for(const q of sg.spr)if(q.sp.lit>1)pool(q.x+so-Math.sign(q.x)*.5,sg.p1.c.z,1800,1.15)}
+      else{for(const o of sg.dyn){if(o.t==='g')pool(o.x+so,zz(o),o.st===2?2000:1300,o.st===2?1.5:o.st===1?.95+.25*Math.sin(CLK*30):.45);else if(o.t==='s'&&o.sp===S.lava)pool(o.x+so,zz(o),1100,.9)}
+        for(const q of sg.spr)if(q.sp===S.vent)pool(q.x+so-Math.sign(q.x)*.3,sg.p1.c.z,1000,.55)}}
+    for(let n=DR-1;n>=0;n--){const sg=SQ(n);if(sg.p1.c.z<=CAMD)continue;const so=SHX(n)/ROADW,p1=sg.p1.s,p2=sg.p2.s,fa=sg.fog>f1?Math.max(0,1-(sg.fog-f1)/(f2-f1)):1;
       if(fa<=0&&!th.vis)continue;
       const nf=sg.p1.c.z<PLZ?clamp((sg.p1.c.z-380)/(PLZ-380),0,1):1;if(nf<=0)continue;
       for(const q of sg.spr){const al=(th.vis&&q.sp.lit?Math.max(fa,sg.fog<.93?.82:0):fa)*nf;if(al<=0)continue;const dw=q.sp.ww*p1.sc*vw/2,dh=dw*q.sp.ar,qx=p1.x+p1.sc*q.x*ROADW*vw/2;
         if(q.sp.sh===undefined)q.sp.sh=NOSH.indexOf(q.sp)<0;if(q.sp.sh&&FXOK&&dw>5&&p1.y<sg.clip&&!th.vis){ctx.globalAlpha=al*.2;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(qx+dw*.06,p1.y,dw*.4,Math.max(1,dw*.055),0,0,7);ctx.fill()}
-        ctx.globalAlpha=al;blit(q.sp,qx-dw/2,p1.y,dw,dh,sg.clip);if(th.vis&&q.sp.lit&&dw>9&&NL.length<18&&p1.y-dh<sg.clip)NL.push(q.sp.lit>1?[qx+dw*.3*(q.x>0?-1:1),p1.y-dh*.9,Math.min(64,dw*1.1),'#ffe9b0',.75*al]:[qx,p1.y-dh*.62,Math.min(56,dw*.75),'#ffd23f',.4*al])}
+        ctx.globalAlpha=al;if(NT)ctx.tint=q.sp.lit?1:lum(q.x+so,sg.p1.c.z);blit(q.sp,qx-dw/2,p1.y,dw,dh,sg.clip);if(NT)ctx.tint=1;if(th.vis&&q.sp.lit&&dw>9&&NL.length<18&&p1.y-dh<sg.clip)NL.push(q.sp.lit>1?[qx+dw*.3*(q.x>0?-1:1),p1.y-dh*.9,Math.min(64,dw*1.1),'#ffe9b0',.75*al]:[qx,p1.y-dh*.62,Math.min(56,dw*.75),'#ffd23f',.4*al])}
       ctx.globalAlpha=fa;
       for(const o of sg.dyn){if(o.t!=='k'&&mix(sg.p1.c.z,sg.p2.c.z,o.pct)<450)continue;
         if(fa<=0){if(o.t==='k'&&sg.fog<.95){const sc=mix(p1.sc,p2.sc,o.pct)*vw/2,sx=mix(p1.x,p2.x,o.pct)+sc*o.x*ROADW,sy=mix(p1.y,p2.y,o.pct),w=KW*sc;if(sy<=sg.clip)for(const sd of[-1,1])NL.push([sx+sd*w*.3,sy-o.c.hy*sc-w*.3,Math.max(2.5,w*.22),'#ff4f8b',.9])}continue}const sc=mix(p1.sc,p2.sc,o.pct)*vw/2,sx=mix(p1.x,p2.x,o.pct)+sc*o.x*ROADW,sy=mix(p1.y,p2.y,o.pct);
         if(sy-sc*900>sg.clip)continue;const cl=sy>sg.clip;if(cl){ctx.save();ctx.beginPath();ctx.rect(-10,-10,vw+20,sg.clip+10);ctx.clip()}
+        if(NT)ctx.tint=Math.max(o.t==='k'?.84:.72,lum(o.x+so,mix(sg.p1.c.z,sg.p2.c.z,o.pct)));
         if(o.t==='k'){const c=o.c,w=KW*sc,k=w/100*(c.slow>0?.72:1);
+          /* sur la glace, le kart se reflète sous lui */
+          if(TXR&&sg.ice&&c.hy<=0&&c.spin<=0&&w>14){ctx.save();ctx.globalAlpha=fa*.2;ctx.translate(sx,sy+w*.02);ctx.scale(k,-k*.82);ctx.rotate(-c.st*(c.dr>0?.16:.06));drawKart(KC[c.i],c.st,false,c.z,c.kt.id);ctx.restore();ctx.globalAlpha=fa}
           ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(sx,sy,w*.46*(1-Math.min(.5,c.hy/1600)),w*.09,0,0,7);ctx.fill();
           ctx.save();ctx.translate(sx,sy-c.hy*sc);ctx.scale(k*(c.spin>0?Math.cos(c.spin*13):1),k);if(c.trk>0){ctx.translate(0,-36);ctx.rotate((1-c.trk/.5)*6.283);ctx.translate(0,36)}else ctx.rotate(c.st*(c.dr>0?.16:.06));drawKart(KC[c.i],c.st,c.bt>0||c.star>0,c.z,c.kt.id);ctx.restore();
           if(c.star>0&&(c.star>1.2||Math.floor(CLK*10)%2))glow(sx,sy-c.hy*sc-w*.34,w*.95,['#ff4f8b','#ffe45c','#39d3ff','#5be39a'][Math.floor(CLK*14)%4],.75);
@@ -1873,11 +1911,11 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
             else if(o.st===2){const h=sc*2100*(.86+.14*Math.sin(CLK*40));glow(sx,sy-h*.5,h*.62,'#ff9f43',.85);ctx.globalAlpha=fa;ctx.fillStyle='#ff6a3d';rr(ctx,sx-w*.42,sy-h,w*.84,h,w*.4);ctx.fill();ctx.fillStyle='#ffd23f';rr(ctx,sx-w*.22,sy-h*.95,w*.44,h*.95,w*.2);ctx.fill();
               for(let j=0;j<6;j++)disc(sx+(Math.random()-.5)*w*1.7,sy-h*(.55+Math.random()*.55),Math.max(1,w*.09),'#ffb347')}}}
         else{const w=sc*220;glow(sx,sy-w*.6,w*1.2,'#ff9f43',.9);ctx.fillStyle='#0e0a1c';ctx.beginPath();ctx.ellipse(sx,sy-w*.6,w*.5,w*.5,0,0,7);ctx.fill();disc(sx,sy-w*.6,w*.4,'#f1f3fa');disc(sx,sy-w*.6,w*.2,o.col)}
-        if(cl)ctx.restore()}}
+        if(cl)ctx.restore()}if(NT)ctx.tint=1}
     ctx.globalAlpha=1;
     if(me.bt>0||me.slip>.3){ctx.strokeStyle=me.bt>0?'rgba(255,255,255,.35)':'rgba(180,230,255,.3)';ctx.lineWidth=2;for(let k=0;k<(me.bt>0?14:8);k++){const a=Math.random()*6.283,r1=vw*(.22+Math.random()*.1),r2=r1+40+Math.random()*90;ctx.beginPath();ctx.moveTo(vw/2+Math.cos(a)*r1,hz+Math.sin(a)*r1*.5);ctx.lineTo(vw/2+Math.cos(a)*r2,hz+Math.sin(a)*r2*.5);ctx.stroke()}}
     ambient(th,me,vw,vh,hz,full,L);
-    if(th.vis){const cx=vw/2+me.st*40,bh=vh-hz;ctx.fillStyle='rgba(5,3,18,.6)';ctx.beginPath();ctx.moveTo(-70,hz);ctx.lineTo(cx-80,hz);ctx.lineTo(cx-330,vh+4);ctx.lineTo(-70,vh+4);ctx.closePath();ctx.moveTo(vw+70,hz);ctx.lineTo(cx+80,hz);ctx.lineTo(cx+330,vh+4);ctx.lineTo(vw+70,vh+4);ctx.closePath();ctx.fill();
+    if(th.vis){if(!NT){const cx=vw/2+me.st*40,bh=vh-hz;ctx.fillStyle='rgba(5,3,18,.6)';ctx.beginPath();ctx.moveTo(-70,hz);ctx.lineTo(cx-80,hz);ctx.lineTo(cx-330,vh+4);ctx.lineTo(-70,vh+4);ctx.closePath();ctx.moveTo(vw+70,hz);ctx.lineTo(cx+80,hz);ctx.lineTo(cx+330,vh+4);ctx.lineTo(vw+70,vh+4);ctx.closePath();ctx.fill()}
       ctx.globalCompositeOperation='lighter';for(const q of NL){ctx.globalAlpha=q[4];ctx.drawImage(GL[q[3]],q[0]-q[2],q[1]-q[2],q[2]*2,q[2]*2)}ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over'}
     if(ps.wind){ctx.strokeStyle='rgba(255,255,255,.42)';ctx.lineWidth=2;ctx.lineCap='round';for(let k=0;k<14;k++){const u=((CLK*1.7*ps.wind+k*.371)%1+1)%1,yy=((k*97)%100)/100*vh,xx=u*(vw+160)-80;ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx+ps.wind*(50+(k%4)*18),yy+5);ctx.stroke()}}
     if(s.flash>0){ctx.fillStyle='rgba(255,250,200,'+Math.min(.7,s.flash*2)+')';ctx.fillRect(0,0,vw,vh)}
