@@ -4876,6 +4876,8 @@ const touchMode=()=>TOUCH&&padCount===0;
     $('#err').textContent='';const q=shuffle(ids.slice()),R={q,goal:GOAL,cs:{},bs:{},deck:[]},a=q.shift(),b=q.shift(),stats={},nms={};
     for(const i of ids){stats[i]={j:0,v:0,pf:0,pc:0};nms[i]=nm(i)}
     T={sched:[mk(R,a,b)],i:0,stats,names:nms,roi:R};save();audioInit();showIntro()};
+  /* le bouton de l'accueil gardait en mémoire l'ancien lancement : on le rebranche sur celui-ci */
+  {const sb=$('#start');if(sb)sb.onclick=()=>startTournament()}
   /* matchs raccourcis : le nombre de points gagnants du match en cours remplace celui du jeu, le temps du lancement */
   const sm0=startMatch;startMatch=function(d,free){let to=0;if(!free&&T&&T.roi){const m=T.sched[T.i];if(m&&m.a===d.a&&m.b===d.b&&m.g===d.g)to=m.to|0}
     if(to<1){sm0(d,free);return}const G=GAMES[d.g],own=Object.prototype.hasOwnProperty.call(G,'to'),t0=G.to;G.to=to;try{sm0(d,free)}finally{if(own)G.to=t0;else delete G.to}};
