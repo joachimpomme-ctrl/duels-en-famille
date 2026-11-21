@@ -202,7 +202,7 @@ function poll(){
   let pads=[];
   try{pads=Array.from(navigator.getGamepads?navigator.getGamepads():[]).filter(g=>g&&g.connected);padErr=false}catch(e){padErr=true}
   padCount=pads.length;pads=padSlots(pads);
-  const raw=[padRead(0,pads[0]),padRead(1,pads[1])];
+  const raw=[padRead(0,PMAP[0],pads[PMAP[0]]),padRead(1,PMAP[1],pads[PMAP[1]])];
   const vs=!!M&&phase==='play'&&M.b===CPU;
   for(let i=0;i<2;i++){
     let n=raw[i];
@@ -955,7 +955,7 @@ function renderSetup(focusId){
 let padTxt='';
 function padStatus(){
   const t=padErr?'<span class="err">Cette page n\'a pas accès aux manettes. Ouvre le fichier du jeu directement dans Chrome.</span>'
-    :padCount?'<b>'+padCount+' manette'+(padCount>1?'s':'')+' détectée'+(padCount>1?'s':'')+'.</b> La première reconnue est celle du joueur de gauche.'
+    :padCount?'<b>'+padCount+' manette'+(padCount>1?'s':'')+' détectée'+(padCount>1?'s':'')+'.</b> Chaque joueur garde la sienne d\'un match à l\'autre : les noms se règlent en haut de cette page.'
     :'Aucune manette détectée. Branche-les puis appuie sur un bouton de chacune.';
   if(t!==padTxt){padTxt=t;$('#pads').innerHTML=t}
 }
@@ -4578,14 +4578,21 @@ function bigPlane(L,S,col,eng){return layer(L+20,S+20,g=>{g.translate((L+20)/2,(
 /* ================= manettes : places fixes ================= */
 /* Avant : la liste des manettes était recompactée à chaque image. Si la manette de gauche décrochait un instant, celle de droite prenait sa place et pilotait l'autre joueur. */
 const PSL=[null,null];
+/* La manette suit le joueur d'un match à l'autre, quel que soit son côté. cfg.ph = qui tient la manette 1 et la manette 2. */
+let PMAP=[0,1];
+function padHolders(){const h=Array.isArray(cfg.ph)?cfg.ph:[],ok=id=>typeof id==='string'&&cfg.players.some(q=>q.id===id&&q.on),r=[0,1].map(i=>ok(h[i])?h[i]:null);if(r[0]&&r[0]===r[1])r[1]=null;return r}
+function padPlan(a,b){const h=padHolders();if(a===CPU||b===CPU)return{map:[0,1],was:[null,null],h};let sa=h.indexOf(a),sb=h.indexOf(b);
+  if(sa<0&&sb<0){sa=0;sb=1}else if(sa<0)sa=1-sb;else if(sb<0)sb=1-sa;return{map:[sa,sb],was:[h[sa],h[sb]],h}}
+function padAssign(a,b){const pl=padPlan(a,b);PMAP=pl.map;if(a!==CPU&&b!==CPU){const h=[null,null];h[pl.map[0]]=a;h[pl.map[1]]=b;cfg.ph=h;save()}}
+function padLine(a,b){if(a===CPU||b===CPU)return'';const pl=padPlan(a,b);return'Manettes : '+nm(a)+' la '+(pl.map[0]+1)+', '+nm(b)+' la '+(pl.map[1]+1)+'.'}
 function padSlots(list){const now=performance.now(),live={};for(const g of list)live[g.index]=g;
   for(const k of Object.keys(live).map(Number).sort((a,b)=>a-b)){if((PSL[0]&&PSL[0].idx===k)||(PSL[1]&&PSL[1].idx===k))continue;
     let f=-1;for(let i=0;i<2&&f<0;i++)if(!PSL[i])f=i;for(let i=0;i<2&&f<0;i++)if(!live[PSL[i].idx])f=i;
     if(f>=0)PSL[f]={idx:k,seen:now,last:null,lost:0,warn:false}}
   for(let i=0;i<2;i++){const s=PSL[i];if(!s)continue;if(live[s.idx]){s.seen=now;s.lost=0;s.warn=false}else s.lost=now-s.seen}
-  if(phase!=='play'){for(let i=0;i<2;i++)if(PSL[i]&&PSL[i].lost>4000)PSL[i]=null;if(!PSL[0]&&PSL[1]){PSL[0]=PSL[1];PSL[1]=null}}
+  if(phase!=='play')for(let i=0;i<2;i++)if(PSL[i]&&PSL[i].lost>4000)PSL[i]=null;
   return[0,1].map(i=>(PSL[i]&&live[PSL[i].idx])||null)}
-function padRead(i,g){const s=PSL[i];if(g){const r=readSide(KM[i],g);if(s){s.last=r;const k=readSide(KM[i],null);if(BT.some(q=>r[q]&&!k[q]))s.act=performance.now()}return r}
+function padRead(i,sl,g){const s=PSL[sl];if(g){const r=readSide(KM[i],g);if(s){s.last=r;const k=readSide(KM[i],null);if(BT.some(q=>r[q]&&!k[q]))s.act=performance.now()}return r}
   const k=readSide(KM[i],null);if(s&&s.last&&s.lost<220){const r={};for(const q of BT)r[q]=s.last[q]||k[q];return r}   /* micro-coupure : on garde le dernier état */
   return k}
 /* écran d'accueil : savoir quelle manette est laquelle, et pouvoir les échanger */
@@ -4593,18 +4600,23 @@ let padKey='';
 function padUI(){let box=document.getElementById('padui');
   if(!box){const host=document.querySelector('#setup .sub')||document.getElementById('pads');if(!host)return;   /* tout en haut de l'accueil, visible sans défiler */
     const st=document.createElement('style');st.textContent='#padui{display:flex;gap:12px;align-items:stretch;justify-content:flex-start;margin:14px 0 4px;flex-wrap:wrap}'
-      +'#padui .pc{min-width:220px;padding:9px 16px;border-radius:14px;border:2px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);text-align:left;transition:transform .08s,background .08s;opacity:.55}'
-      +'#padui .pc b{display:block;font-size:16px}#padui .pc span{display:block;font-size:12px;opacity:.8}#padui .pc em{display:block;font-style:normal;font-size:12px;margin-top:3px;opacity:.85}'
-      +'#padui .pc.on{opacity:1}#padui #pc0.on{border-color:'+COL[0]+'}#padui #pc1.on{border-color:'+COL[1]+'}#padui #pc0.on b{color:'+COL[0]+'}#padui #pc1.on b{color:'+COL[1]+'}'
-      +'#padui .pc.act{transform:scale(1.06)}#padui #pc0.act{background:'+COL[0]+'}#padui #pc1.act{background:'+COL[1]+'}#padui #pc0.act b,#padui #pc1.act b,#padui .pc.act span,#padui .pc.act em{color:#07081a;opacity:1}'
-      +'#padui #pswap{align-self:center;padding:8px 14px;border-radius:999px;font-weight:700}';document.head.appendChild(st);
-    box=document.createElement('div');box.id='padui';box.innerHTML='<div class="pc" id="pc0"></div><button id="pswap" type="button">⇄ Échanger</button><div class="pc" id="pc1"></div>';
+      +'#padui .pc{min-width:230px;padding:9px 16px 11px;border-radius:14px;border:2px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);text-align:left;transition:transform .08s,background .08s;opacity:.55}'
+      +'#padui .pc b{display:block;font-size:16px}#padui .pc label{display:flex;align-items:center;gap:8px;font-size:13px;margin:5px 0 2px}#padui .pc em{display:block;font-style:normal;font-size:12px;margin-top:3px;opacity:.85}'
+      +'#padui select{flex:1;min-width:0;background:#0f1226;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 8px;font:inherit;font-size:15px;font-weight:700}'
+      +'#padui .pc.on{opacity:1;border-color:#aab1ff}#padui .pc.act{transform:scale(1.05);background:#e9ebff}#padui .pc.act b,#padui .pc.act label,#padui .pc.act em{color:#07081a;opacity:1}'
+      +'#padui #pswap{align-self:center;padding:8px 14px;border-radius:999px;font-weight:700}#padui .pn{flex-basis:100%;margin:2px 0 0;font-size:13px;opacity:.75}';document.head.appendChild(st);
+    box=document.createElement('div');box.id='padui';
+    box.innerHTML=[0,1].map(i=>'<div class="pc" id="pc'+i+'"><b>Manette '+(i+1)+'</b><label>Joueur <select id="ph'+i+'" aria-label="Joueur qui tient la manette '+(i+1)+'"></select></label><em></em></div>').join('<button id="pswap" type="button">⇄ Échanger</button>')
+      +'<p class="pn">Chaque joueur garde sa manette d\'un match à l\'autre, qu\'il joue à gauche ou à droite.</p>';
     host.parentNode.insertBefore(box,host.nextSibling);
-    document.getElementById('pswap').onclick=()=>{const t=PSL[0];PSL[0]=PSL[1];PSL[1]=t;padKey='';try{SFX.click()}catch(e){}}}
-  const now=performance.now(),S=[0,1].map(i=>{const s=PSL[i];return!s||s.lost>0?0:(s.act&&now-s.act<450?2:1)}),key=S.join('')+(PSL[0]?PSL[0].idx:'-')+(PSL[1]?PSL[1].idx:'-');
+    document.getElementById('pswap').onclick=()=>{const t=PSL[0];PSL[0]=PSL[1];PSL[1]=t;padKey='';try{SFX.click()}catch(e){}};
+    for(let i=0;i<2;i++)document.getElementById('ph'+i).onchange=function(){const h=padHolders(),v=this.value||null;if(v&&h[1-i]===v)h[1-i]=h[i];h[i]=v;cfg.ph=h;save();padKey='';this.blur()}}
+  const now=performance.now(),S=[0,1].map(i=>{const s=PSL[i];return!s||s.lost>0?0:(s.act&&now-s.act<450?2:1)}),h=padHolders(),pl=cfg.players.filter(q=>q.on),
+    key=S.join('')+(PSL[0]?PSL[0].idx:'-')+(PSL[1]?PSL[1].idx:'-')+'/'+h.join(',')+'/'+pl.map(q=>q.id+':'+q.n).join('|');
   if(key===padKey)return;padKey=key;box.style.display=S[0]||S[1]?'':'none';document.getElementById('pswap').style.display=S[0]&&S[1]?'':'none';
-  for(let i=0;i<2;i++){const e=document.getElementById('pc'+i);e.className='pc'+(S[i]?' on':'')+(S[i]===2?' act':'');
-    e.innerHTML='<b>Manette '+(i+1)+'</b><span>'+(i?'joueur de droite, en jaune':'joueur de gauche, en bleu')+'</span><em>'+(S[i]===2?'C\'est celle-ci !':S[i]?'Appuie sur un bouton pour la repérer':'pas encore reconnue : appuie sur un de ses boutons')+'</em>'}}
+  for(let i=0;i<2;i++){const e=document.getElementById('pc'+i),se=document.getElementById('ph'+i);e.className='pc'+(S[i]?' on':'')+(S[i]===2?' act':'');
+    e.querySelector('em').textContent=S[i]===2?'C\'est celle-ci !':S[i]?'Appuie sur un bouton pour la repérer':'pas encore reconnue : appuie sur un de ses boutons';
+    if(document.activeElement!==se){se.textContent='';se.add(new Option('au premier match',''));for(const q of pl)se.add(new Option(q.n,q.id));se.value=h[i]||''}}}
 /* manette perdue en plein match : pause automatique et message clair */
 function padWatch(){const el=document.getElementById('padmsg');
   if(phase==='setup')padUI();
@@ -4613,8 +4625,14 @@ function padWatch(){const el=document.getElementById('padmsg');
   if(lost<0){if(el&&!paused)el.textContent='';return}
   const s=PSL[lost];if(s.warn)return;s.warn=true;
   let e=el;if(!e){const pz=document.querySelector('#pause .actions');if(pz){e=document.createElement('p');e.id='padmsg';e.style.cssText='color:#ffd27a;font-weight:700;margin:0 0 14px;max-width:440px';pz.parentNode.insertBefore(e,pz)}}
-  if(e)e.textContent='La manette '+(lost+1)+' ne répond plus. Appuie sur un de ses boutons pour la réveiller, puis reprends la partie.';
+  const hd=padHolders()[lost];if(e)e.textContent='La manette '+(lost+1)+(hd?', celle de '+nm(hd)+',':'')+' ne répond plus. Appuie sur un de ses boutons pour la réveiller, puis reprends la partie.';
   if(!paused)togglePause()}
+
+(function(){const sm0=startMatch,si0=showIntro,rp0=renderPick;
+  startMatch=function(d,free){padAssign(d.a,d.b);sm0(d,free)};
+  showIntro=function(){si0();try{const m=T&&T.sched[T.i];if(!m||m.b===CPU||m.a===CPU)return;const pl=padPlan(m.a,m.b),sp=document.querySelectorAll('#panelBody .vs .card span');
+    [m.a,m.b].forEach((id,i)=>{if(!sp[i])return;const n=pl.map[i]+1,w=pl.was[i];sp[i].textContent=w===id?'Garde la manette '+n:w?'Prend la manette '+n+', celle de '+nm(w):'Manette '+n})}catch(e){}};
+  renderPick=function(keep){rp0(keep);try{const t=F?padLine(F.a,F.b):'',ac=document.querySelector('#panelBody .actions');if(t&&ac){const n=document.createElement('p');n.className='note';n.textContent=t;ac.parentNode.insertBefore(n,ac)}}catch(e){}}})();
 
 /* ================= coup de pouce, palmarès, fin de tournoi ================= */
 (function(){
