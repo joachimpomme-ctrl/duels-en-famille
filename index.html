@@ -4634,6 +4634,27 @@ function padWatch(){const el=document.getElementById('padmsg');
     [m.a,m.b].forEach((id,i)=>{if(!sp[i])return;const n=pl.map[i]+1,w=pl.was[i];sp[i].textContent=w===id?'Garde la manette '+n:w?'Prend la manette '+n+', celle de '+nm(w):'Manette '+n})}catch(e){}};
   renderPick=function(keep){rp0(keep);try{const t=F?padLine(F.a,F.b):'',ac=document.querySelector('#panelBody .actions');if(t&&ac){const n=document.createElement('p');n.className='note';n.textContent=t;ac.parentNode.insertBefore(n,ac)}}catch(e){}}})();
 
+/* ================= plein écran à tout moment, écran maintenu allumé ================= */
+(function(){
+  const D=document,can=()=>!!D.documentElement.requestFullscreen;
+  /* les manettes ne comptent pas comme une activité pour l'ordinateur : on demande au navigateur de garder l'écran allumé */
+  let wl=null,busy=false;
+  function wnote(){let n=D.getElementById('wlnote');if(!n){const f=D.getElementById('fs'),ac=f&&f.closest('.actions');if(!ac)return;n=D.createElement('p');n.className='note';n.id='wlnote';ac.parentNode.insertBefore(n,ac.nextSibling)}
+    const t=!navigator.wakeLock?'Ce navigateur ne sait pas bloquer la mise en veille : règle l\'économiseur d\'écran de l\'ordinateur.':wl?'Mise en veille bloquée tant que le jeu reste affiché. Touche E : plein écran.':'Mise en veille pas encore bloquée. Touche E : plein écran.';if(n.textContent!==t)n.textContent=t}
+  async function wake(){if(!wl&&!busy&&navigator.wakeLock&&D.visibilityState==='visible'){busy=true;try{const s=await navigator.wakeLock.request('screen');wl=s;s.addEventListener('release',()=>{if(wl===s)wl=null;wnote()})}catch(e){wl=null}busy=false}wnote()}
+  D.addEventListener('visibilitychange',wake);addEventListener('pointerdown',wake);addEventListener('keydown',wake);setInterval(wake,4000);wake();
+  window.fsToggle=function(){try{if(D.fullscreenElement)D.exitFullscreen();else{const q=D.documentElement.requestFullscreen();if(q&&q.catch)q.catch(()=>{})}}catch(e){}};
+  const pz=D.querySelector('#pause .actions');let pb=null;
+  if(pz&&can()){pb=D.createElement('button');pb.id='pfs';pb.onclick=fsToggle;pz.insertBefore(pb,D.querySelector('#restart'))}
+  const lab=()=>{const on=!!D.fullscreenElement,t=on?'Quitter le plein écran':'Plein écran';if(pb)pb.textContent=t;const h=D.getElementById('fs');if(h)h.textContent=t;
+    if(on){let n=0;D.querySelectorAll('.fsx').forEach(b=>{b.remove();n++});if(n&&phase!=='setup'&&phase!=='play')try{navInit()}catch(e){}}};
+  D.addEventListener('fullscreenchange',()=>{lab();wake()});lab();
+  /* sur les écrans entre les matchs, le bouton n'apparaît que si l'on n'est pas déjà en plein écran */
+  const p0=panel;panel=function(html,keep){p0(html,keep);try{if(!can()||D.fullscreenElement||touchMode())return;const ac=D.querySelector('#panelBody .actions');if(!ac)return;
+    const b=D.createElement('button');b.className='fsx';b.textContent='Plein écran';b.onclick=fsToggle;ac.appendChild(b);if(keep)navFocus(navI);else navInit()}catch(e){}};
+  addEventListener('keydown',e=>{if(e.code!=='KeyE'||e.repeat||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target&&e.target.tagName;if(t==='INPUT'||t==='SELECT'||t==='TEXTAREA')return;fsToggle()});
+})();
+
 /* ================= coup de pouce, palmarès, fin de tournoi ================= */
 (function(){
   const AL=['Aide : non','Aide : oui','Aide : forte'],RK='duels-famille-palmares-v1',E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
