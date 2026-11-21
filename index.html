@@ -4793,6 +4793,52 @@ const touchMode=()=>TOUCH&&padCount===0;
     const t='<b>Téléphone détecté.</b> Commandes tactiles à l\'écran, en solo contre l\'ordi : croix à gauche, A pour le bouton principal, B pour le second bouton. Tiens le téléphone à l\'horizontale.';
     if(padTxt!==t){padTxt=t;$('#pads').innerHTML=t}};
 })();
+/* ================= mode « Le gagnant reste » : le vainqueur reste en jeu, le suivant de la file le défie ================= */
+(function(){
+  const GOAL=5,short=t=>t>=5?3:t===3?2:t,pl=(n,a,b)=>n+' '+(n>1?b:a),names=L=>L.map(i=>esc(nm(i))).join(', ');
+  const st=document.createElement('style');st.textContent='.roiq{font-size:15px;color:var(--mut);margin:6px 0 0}.roiq b{color:var(--txt)}';document.head.appendChild(st);
+  function mk(R,a,b){const gs=Object.keys(GAMES).filter(k=>cfg.games[k]);if(!R.deck||!R.deck.length)R.deck=shuffle(gs.slice());let g=R.deck.pop();if(!GAMES[g]||!cfg.games[g])g=gs[0]||Object.keys(GAMES)[0];return{a,b,g,to:short(GAMES[g].to||5)}}
+  function roiTable(){const R=T.roi;return'<table><tr><th></th><th>Joueur</th><th>Victoires</th><th>Série en cours</th><th>Meilleure série</th><th>Matchs</th></tr>'+
+    ranking().map((r,k)=>'<tr'+(k===0&&r.v?' class="first"':'')+'><td>'+(k+1)+'</td><td>'+esc(nm(r.i))+'</td><td>'+r.v+' sur '+R.goal+'</td><td>'+(R.cs[r.i]||0)+'</td><td>'+(R.bs[r.i]||0)+'</td><td>'+r.j+'</td></tr>').join('')+'</table>'}
+  /* accueil : troisième choix à côté de « Partie rapide » et « Soirée » */
+  const rs0=renderSetup;renderSetup=function(f){rs0(f);try{const on=!touchMode(),Mo=$('#modes');
+      if(Mo&&on){const n=humans().length,b=document.createElement('button');b.textContent='Le gagnant reste · '+(n>=3?'premier à '+GOAL+' victoires':'à trois joueurs ou plus');if(cfg.mode==='roi')b.className='sel';b.onclick=()=>{cfg.mode='roi';save();renderSetup()};Mo.append(b)}
+      const S=$('#start');if(S)S.textContent=cfg.mode==='roi'&&on?'Lancer la partie':'Lancer le tournoi';
+      const R=$('#resume');if(R&&T&&T.roi)R.textContent='Reprendre « Le gagnant reste » (match '+(T.i+1)+')'}catch(e){}};
+  const st0=startTournament;startTournament=function(){if(cfg.mode!=='roi'||touchMode()){st0();return}
+    const ids=humans(),gs=Object.keys(GAMES).filter(k=>cfg.games[k]);
+    if(ids.length<3){$('#err').textContent='« Le gagnant reste » se joue à trois ou plus : coche un joueur de plus.';return}
+    if(!gs.length){$('#err').textContent='Choisis au moins un mini-jeu.';return}
+    $('#err').textContent='';const q=shuffle(ids.slice()),R={q,goal:GOAL,cs:{},bs:{},deck:[]},a=q.shift(),b=q.shift(),stats={},nms={};
+    for(const i of ids){stats[i]={j:0,v:0,pf:0,pc:0};nms[i]=nm(i)}
+    T={sched:[mk(R,a,b)],i:0,stats,names:nms,roi:R};save();audioInit();showIntro()};
+  /* matchs raccourcis : le nombre de points gagnants du match en cours remplace celui du jeu, le temps du lancement */
+  const sm0=startMatch;startMatch=function(d,free){let to=0;if(!free&&T&&T.roi){const m=T.sched[T.i];if(m&&m.a===d.a&&m.b===d.b&&m.g===d.g)to=m.to|0}
+    if(to<1){sm0(d,free);return}const G=GAMES[d.g],own=Object.prototype.hasOwnProperty.call(G,'to'),t0=G.to;G.to=to;try{sm0(d,free)}finally{if(own)G.to=t0;else delete G.to}};
+  const si0=showIntro;showIntro=function(){si0();if(!T||!T.roi)return;try{const R=T.roi,m=T.sched[T.i],body=$('#panelBody'),k=body.querySelector('.kicker'),go=body.querySelector('.go'),ac=body.querySelector('.actions'),
+      hc=Array.from(body.querySelectorAll('.hc')).find(e=>/d'avance/.test(e.textContent));
+    if(k)k.textContent='Le gagnant reste · match '+(T.i+1);
+    if(go)go.textContent='Premier à '+m.to+' points. La partie va au premier qui gagne '+R.goal+' matchs.';
+    const d=lvlOf(m.a)-lvlOf(m.b),n=Math.min(Math.abs(d),m.to-1);if(hc){if(n)hc.textContent=nm(d>0?m.a:m.b)+' démarre avec '+pl(n,'point','points')+' d\'avance.';else hc.remove()}
+    const tn=[m.a,m.b].find(i=>(R.cs[i]||0)>0);let h='';
+    if(tn)h+='<p class="roiq"><b>'+esc(nm(tn))+'</b> défend sa place : '+pl(R.cs[tn],'victoire','victoires')+' d\'affilée, '+T.stats[tn].v+' sur '+R.goal+' au total.</p>';
+    if(R.q.length)h+='<p class="roiq">En attente : '+names(R.q)+'.</p>';if(ac&&h)ac.insertAdjacentHTML('beforebegin',h)}catch(e){}};
+  const em0=endMatch;endMatch=function(){if(!M||M.free||!T||!T.roi){em0();return}
+    const R=T.roi,w=M.score[0]>M.score[1]?0:1,win=w?M.b:M.a,los=w?M.a:M.b,g=M.G.name;
+    R.cs[win]=(R.cs[win]||0)+1;R.cs[los]=0;R.bs[win]=Math.max(R.bs[win]||0,R.cs[win]);
+    const done=T.stats[win].v+1>=R.goal;let ch=null;
+    if(!done){R.q.push(los);ch=R.q.shift();T.sched.push(w?mk(R,ch,win):mk(R,win,ch))}   /* le vainqueur garde son côté */
+    em0();
+    try{const body=$('#panelBody'),k=body.querySelector('.kicker'),tb=body.querySelector('table'),ac=body.querySelector('.actions'),s=R.cs[win];
+      if(k)k.textContent='Le gagnant reste · match '+T.i+' · '+g;if(tb)tb.outerHTML=roiTable();
+      let h='<p class="hc">'+esc(nm(win))+(done?' atteint '+R.goal+' victoires.':' reste en jeu'+(s>1?' : '+s+' victoires d\'affilée.':'.'))+'</p>';
+      if(!done)h+='<p class="roiq"><b>'+esc(nm(ch))+'</b> entre en jeu.'+(R.q.length?' Ensuite : '+names(R.q)+'.':'')+'</p>';
+      if(ac)ac.insertAdjacentHTML('beforebegin',h)}catch(e){}};
+  const sf0=showFinal;showFinal=function(){const roi=!!(T&&T.roi),tb=roi?roiTable():'',w=roi?nm(ranking()[0].i):'';sf0();if(!roi)return;
+    try{const body=$('#panelBody'),k=body.querySelector('.kicker'),t=body.querySelector('.title'),tbs=body.querySelectorAll('table');
+      if(k)k.textContent='Le gagnant reste · partie terminée';if(t)t.textContent=w+' gagne la partie';if(tbs.length)tbs[tbs.length-1].outerHTML=tb}catch(e){}};
+})();
+
 /* ================= PERSONNAGES ================= */
 function famFace(g,x,y,s,P,hd){
 const OUT='#0a0d22',SK=P.sk,SD=P.sd,HC=P.hc,HL=P.hl||HC,HD=P.hd||'rgba(0,0,0,.3)';
