@@ -1476,7 +1476,7 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
   /* ----- circuits ----- */
   const DEFS=[
     {th:0,seed:11,road:[[30,40,30,0,0],[40,60,40,3,20],[30,30,30,-4,0],[30,30,30,4,0],[20,80,20,0,-30],[40,90,40,-5,10],[20,40,20,0,25],[20,40,20,0,-25],[30,50,30,6,0],[25,25,25,-3,15],[25,25,25,3,-15],[25,25,25,-3,0],[30,100,30,0,0],[40,70,40,4,-10],[30,60,30,-6,20],[20,60,20,0,0]],
-      boxes:[.1,.33,.56,.8],pads:[.24,.68],ramps:[.44,.72],ponts:[.52],wind:[[.13,110,1],[.36,100,-1],[.6,110,1],[.84,100,-1]],br:[[.278,186,-1,[[8,12,8,-5],[4,6,4,4]],0,0]]},
+      boxes:[.1,.33,.56,.8],pads:[.24,.68],ramps:[.44,.72],ponts:[.52],wind:[[.13,110,1],[.36,100,-1],[.6,110,1],[.84,100,-1]],br:[[.278,290,-1,[[10,24,10,-5],[8,20,8,4],[8,20,8,-3]],0,0]]},
     {th:1,seed:23,road:[[30,40,30,0,0],[30,40,30,-4,30],[20,30,20,0,-40],[30,60,30,5,20],[20,30,20,-5,0],[20,30,20,5,0],[20,30,20,-5,-20],[30,90,30,0,40],[30,90,30,0,-40],[40,80,40,-3,0],[30,40,30,6,25],[30,40,30,-6,-25],[20,70,20,0,0],[40,100,40,4,15],[25,25,25,-4,0],[25,25,25,4,-15],[20,70,20,0,0]],
       boxes:[.08,.3,.52,.77],pads:[.4,.88],ramps:[.38,.66],ponts:[.2,.7],br:[[.45,385,-1,[[10,30,10,-4],[10,36,10,5],[10,30,10,-5],[10,40,10,3],[10,50,10,-4]],1,0]]},
     {th:2,seed:37,road:[[30,60,30,0,0],[50,120,50,3,30],[50,120,50,-3,-30],[20,60,20,0,34],[20,60,20,0,-34],[30,40,30,6,0],[30,40,30,-6,0],[30,100,30,0,0],[40,90,40,-4,25],[20,40,20,0,-40],[40,80,40,5,0],[25,30,25,-5,20],[25,30,25,5,-20],[30,90,30,0,0]],
@@ -1535,7 +1535,10 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       const tree=th.setA[0],sp=S[tree],hw=sp.ww*.32/ROADW,wall=(g,side,o)=>{for(const u of[.2,1.1,2])g.spr.push({sp,x:side*(BOF-.84+o+u),hw,solid:sp.solid})};
       wall(T[i0+DIV],sd,gv(DIV));wall(T[i1-DIV-1],sd,gv(DIV));wall(s[DIV],-sd,gv(DIV));wall(s[n-DIV-1],-sd,gv(DIV));
       add(i0-AP-8,sd>0?'cutR':'cutL',sd*1.55);
-      for(let j=1;j<n-1;j+=2)for(const side of[-1,1]){if(side===-sd&&(j<DIV+3||j>n-DIV-4))continue;if(R()<.25)continue;const nm2=th.setA[R()*th.setA.length|0],q2=S[nm2];s[j].spr.push({sp:q2,x:side*(1.3+q2.ww/2/ROADW+R()*R()*1.6),hw:q2.ww*.32/ROADW,solid:q2.solid})}});
+      /* tant que les deux routes se longent, chacune montre aussi les décors de l'autre : rien n'apparaît d'un coup en changeant de route */
+      const twinSpr=(a,c,o)=>{const ca=a.spr.slice(),cc=c.spr.slice();for(const u of cc)a.spr.push({sp:u.sp,x:u.x+sd*(BOF+o),hw:u.hw,solid:0});for(const u of ca)c.spr.push({sp:u.sp,x:u.x-sd*(BOF+o),hw:u.hw,solid:0})};
+      for(let j=1;j<n-1;j+=2)for(const side of[-1,1]){if(side===-sd&&(j<DIV+3||j>n-DIV-4))continue;if(R()<.25)continue;const nm2=th.setA[R()*th.setA.length|0],q2=S[nm2];s[j].spr.push({sp:q2,x:side*(1.3+q2.ww/2/ROADW+R()*R()*1.6),hw:q2.ww*.32/ROADW,solid:q2.solid})}
+      for(let j=0;j<DIV;j++){twinSpr(T[i0+j],s[j],gv(j));twinSpr(T[i1-1-j],s[n-1-j],gv(j+1))}});
     T.rocks=def.rocks||0;th.tip=TIPS[def.th];
     T.th=th;T.L=N*SEGL;return T}
   const track=k=>TRK[k]||(TRK[k]=build(DEFS[k]));
@@ -1743,13 +1746,15 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
   const otx=(t,x,y,size,c,al)=>{ctx.font='800 '+size+'px "Avenir Next","Trebuchet MS",system-ui,sans-serif';ctx.textAlign=al||'center';ctx.textBaseline='middle';ctx.lineWidth=Math.max(3,size*.26);ctx.lineJoin='round';ctx.strokeStyle='#07081a';ctx.strokeText(t,x,y);ctx.fillStyle=c;ctx.fillText(t,x,y)};
   /* pass : 0 tout sur le canvas du jeu ; 1 le monde seul, vers la carte graphique ; 2 l'affichage du pilote seul, par-dessus */
   function view(s,vi,vy,vh,pass){const me=s.c[vi],T=s.T,N=T.length,L=T.L,th=T.th,vw=W,VF=vw*.27,full=vh>300,hz=Math.round(full?vh*.46:vh*.4);
-    const BR=me.br>=0?T.br[me.br]:null;let bi,bp,ps,pp;
-    if(BR){const cp=(me.bz-PLZ)/SEGL,j=Math.min(BR.n-1,Math.floor(me.bz/SEGL));bi=Math.floor(cp);bp=cp-bi;ps=BR.s[j];pp=clamp(me.bz/SEGL-j,0,1)}
+    let BR=me.br>=0?T.br[me.br]:null,mz=me.bz,mx=me.x,mc=me.cof||0,bi,bp,ps,pp;
+    /* engagé sur la voie d'accès, au-delà du terre-plein : la vue se cale déjà sur le chemin. Le décor change ainsi avant l'embranchement, quand il est encore loin, et plus au moment d'y entrer. */
+    if(!BR)for(const b of T.br){const j=(b.z0-me.z)/SEGL;if(j>0&&j<=WD&&me.x*b.sd>BOF-.98){BR=b;mz=me.z-b.z0;mx=me.x-b.sd*BOF;mc-=b.sd*BOF*.2;break}}
+    if(BR){const cp=(mz-PLZ)/SEGL,j=Math.min(BR.n-1,Math.floor(mz/SEGL));bi=Math.floor(cp);bp=cp-bi;ps=j<0?T[(BR.i0+j+N)%N]:BR.s[j];pp=clamp(mz/SEGL-j,0,1)}
     else{let camZ=me.z-PLZ;if(camZ<0)camZ+=L;bi=Math.floor(camZ/SEGL)%N;bp=(camZ%SEGL)/SEGL;ps=T[Math.floor(me.z/SEGL)%N];pp=(me.z%SEGL)/SEGL}
     /* la suite des tronçons devant la caméra : la piste, ou le chemin de traverse encadré par la piste avant et après lui */
     const SQ=BR?(n=>{const q=bi+n;return q<0?T[(BR.i0+q+N)%N]:q<BR.n?BR.s[q]:T[(BR.i1+q-BR.n)%N]}):(n=>T[(bi+n)%N]),
       SHX=BR?(n=>{const q=bi+n;return q<0||q>=BR.n?-BR.sd*BOF*ROADW:0}):(()=>0),base=SQ(0),zo=bp*SEGL;
-    const camY=CAMH+mix(ps.p1.w.y,ps.p2.w.y,pp),camX=(me.x*.8+(me.cof||0))*ROADW;
+    const camY=CAMH+mix(ps.p1.w.y,ps.p2.w.y,pp),camX=(mx*.8+mc)*ROADW;
     ctx.save();if(pass===1)ctx.viewport(0,vy,vw,vh);else{ctx.beginPath();ctx.rect(0,vy,vw,vh);ctx.clip()}ctx.translate(0,vy);
     if(pass!==2){ctx.save();if(me.hum)shk();
     {const rl=FXOK&&!(me.spin>0)?clamp(-(me.sv||0)*(me.dr>0?.05:.03),-.055,.055):0;if(rl){ctx.translate(vw/2,vh*.64);ctx.rotate(rl);ctx.translate(-vw/2,-vh*.64)}}
