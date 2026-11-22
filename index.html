@@ -1143,7 +1143,7 @@ const GX=(function(){
   const TAU=6.283185307,FONT='px "Avenir Next","Trebuchet MS",system-ui,sans-serif';
   let gl=null,cvs=null,prog=null,vbo=null,vao=null,uR=null,uI=null,lost=false;
   let cap=1<<16,AB=new ArrayBuffer(cap*32),F=new Float32Array(AB),U=new Uint32Array(AB),n=0;
-  let rg=[],cur=null,sc=null,pl=null,PS=2,ATL=null,WH=null,GT=null,S1x=0,S1w=1,S1y=0,S1q=1,S2x=0,S2w=1,S2y=0,S2q=1,SV1=0,SV2=1,SO=0,lt=null,UL=null;
+  let rg=[],cur=null,sc=null,pl=null,PS=2,ATL=null,WH=null,GT=null,S1x=0,S1w=1,S1y=0,S1q=1,S2x=0,S2w=1,S2y=0,S2q=1,SV1=0,SV2=1,SO=0,CT=0,C1q=1,lt=null,UL=null;
   const reg=new Map(),cols=new Map(),txt=new Map(),stk=[];
   let m=[1,0,0,1,0,0],subs=[],sp=null,stx=0,sty=0,pc=null;
   const o={ok:false,dead:false,why:'',draws:0,verts:0,want:true,tag:0,first:true,atl:null,tex:false,lite:false};
@@ -1362,13 +1362,15 @@ const GX=(function(){
         else quadL(x,y,x+w,y,x+w,y+h,x,y+h,gcol(G,x,y),gcol(G,x+w,y),gcol(G,x+w,y+h),gcol(G,x,y+h))}
       else{const k=colOf(st);quadL(x,y,x+w,y,x+w,y+h,x,y+h,k,k,k,k)}},
     /* tronçon de route courant : centre, demi-largeur, hauteur à l'écran et échelle de ses deux bords (proche, lointain), et sa position le long de la piste */
-    seg(x1,w1,y1,q1,x2,w2,y2,q2,v1,v2,so){S1x=x1;S1w=w1;S1y=y1;S1q=q1;S2x=x2;S2w=w2;S2y=y2;S2q=q2;SV1=v1;SV2=v2;SO=so||0},
+    seg(x1,w1,y1,q1,x2,w2,y2,q2,v1,v2,so){S1x=x1;S1w=w1;S1y=y1;S1q=q1;S2x=x2;S2w=w2;S2y=y2;S2q=q2;SV1=v1;SV2=v2;SO=so||0;CT=0;C1q=q1},
+    /* coupe le tronçon courant à la ligne yc (crête qui cache son bas) : son bord proche devient cette ligne, texture et perspective recalculées */
+    cut(yc){if(yc>=S1y)return;const t=clamp((yc-S1y)/((S2y-S1y)||-1),0,1),q=S1q+(S2q-S1q)*t,vq=SV1*S1q+(SV2*S2q-SV1*S1q)*t;CT=t;C1q=S1q;S1x+=(S2x-S1x)*t;S1w+=(S2w-S1w)*t;S1y=yc;S1q=q;SV1=vq/q},
     /* éclairage de la vue en cours (phares, halos, soleil) : un objet rempli au fil du dessin, lu au moment d'envoyer l'image */
     lights(L){lt=L||null},
     /* un point du repère courant, tel qu'il tombe à l'écran */
     pt(x,y){return[X(x,y),Y(x,y)]},
     /* bande texturée le long du tronçon, entre deux positions en travers de la route (en demi-largeurs), bord proche puis bord lointain */
-    strip(la1,lb1,la2,lb2,ua1,ub1,ua2,ub2,col,L){use(WH);const k=colOf(col),xa1=S1x+S1w*la1,xb1=S1x+S1w*lb1,xa2=S2x+S2w*la2,xb2=S2x+S2w*lb2;
+    strip(la1,lb1,la2,lb2,ua1,ub1,ua2,ub2,col,L){use(WH);if(CT>0){const a=C1q*(1-CT),b=S2q*CT;la1=(la1*a+la2*b)/S1q;lb1=(lb1*a+lb2*b)/S1q;ua1=(ua1*a+ua2*b)/S1q;ub1=(ub1*a+ub2*b)/S1q}const k=colOf(col),xa1=S1x+S1w*la1,xb1=S1x+S1w*lb1,xa2=S2x+S2w*la2,xb2=S2x+S2w*lb2;
       VG(xa1,S1y,ua1,SV1,S1q,L,k,la1);VG(xb1,S1y,ub1,SV1,S1q,L,k,lb1);VG(xb2,S2y,ub2,SV2,S2q,L,k,lb2);VG(xa1,S1y,ua1,SV1,S1q,L,k,la1);VG(xb2,S2y,ub2,SV2,S2q,L,k,lb2);VG(xa2,S2y,ua2,SV2,S2q,L,k,la2)},
     /* le sol de part et d'autre, sur toute la largeur de l'écran, du bord lointain jusqu'à la ligne yc */
     ground(yc,col,L){use(WH);const k=colOf(col),t=clamp((yc-S1y)/((S2y-S1y)||-1),0,1),cx=S1x+(S2x-S1x)*t,w=S1w+(S2w-S1w)*t,q=S1q+(S2q-S1q)*t,v=(SV1*S1q+(SV2*S2q-SV1*S1q)*t)/q,xa=-60,xb=W+60,
@@ -1830,7 +1832,8 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
     const sk=ctx.createLinearGradient(0,0,0,hz);sk.addColorStop(0,th.sky[0]);sk.addColorStop(1,th.sky[1]);ctx.fillStyle=sk;ctx.fillRect(-60,-60,vw+120,hz+62);
     let ox=((me.sky*.5)%960+960)%960;ctx.drawImage(th.farI,-ox,hz-160,960,160);ctx.drawImage(th.farI,960-ox,hz-160,960,160);
     ox=((me.sky*1.1)%960+960)%960;ctx.drawImage(th.nearI,-ox,hz-88,960,90);ctx.drawImage(th.nearI,960-ox,hz-88,960,90);
-    ctx.fillStyle=th.g[0];ctx.fillRect(-60,hz,vw+120,vh-hz+70);
+    /* le lointain, sous l'horizon : au sommet d'une côte, on le voit par-dessus la crête. Il prend la brume des derniers tronçons, sinon c'est un aplat de couleur vive derrière une route embrumée. */
+    ctx.fillStyle=th.g[0];ctx.fillRect(-60,hz,vw+120,vh-hz+70);ctx.globalAlpha=th.vis?.97:.92;ctx.fillStyle=th.fog;ctx.fillRect(-60,hz,vw+120,vh-hz+70);ctx.globalAlpha=1;
     const prj=(p,cx,cz)=>{const sc=CAMD/cz;p.c.z=cz;p.s.sc=sc;p.s.x=vw/2+sc*cx*vw/2;p.s.y=Math.round(hz-sc*(p.w.y-camY)*VF);p.s.w=sc*ROADW*vw/2};
     const f0=th.vis||.4,f1=th.vis?th.vis+.1:.5,f2=th.vis?.6:1,NL=[];
     let maxy=vh+40,x=0,dx=-(base.curve*bp);
@@ -1848,8 +1851,10 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       prj(sg.p1,x-camX+sh,n*SEGL-zo);prj(sg.p2,x+dx-camX+sh,(n+1)*SEGL-zo);x+=dx;dx+=sg.curve;
       const p1=sg.p1.s,p2=sg.p2.s;
       if(sg.p1.c.z<=CAMD||p2.y>=p1.y||p2.y>=maxy)continue;
-      const y1=Math.min(p1.y,vh+40),y2=p2.y,d=sg.dk;
-      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20,sh/ROADW);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
+      /* tronçon qui réapparaît derrière une crête : son bas est caché. On le coupe à la ligne de crête, sinon il repeint par-dessus la route déjà dessinée devant. */
+      const part=p1.y>maxy+.5&&maxy<vh+40,y1=Math.min(p1.y,maxy),y2=p2.y,d=sg.dk;
+      if(part){ctx.save();ctx.beginPath();ctx.rect(-90,-90,vw+180,maxy+90);ctx.clip()}
+      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20,sh/ROADW);if(part)ctx.cut(maxy);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
       const r1=p1.w/7,r2=p2.w/7;
       if(!sg.dirt){poly(p1.x-p1.w-r1,p1.y,p1.x-p1.w,p1.y,p2.x-p2.w,p2.y,p2.x-p2.w-r2,p2.y,th.ru[d]);poly(p1.x+p1.w+r1,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x+p2.w+r2,p2.y,th.ru[d])}
       if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d],sg.dirt?2:0);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d]);
@@ -1868,6 +1873,7 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       if(sg.ice){if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,d?'rgba(196,232,255,.82)':'rgba(214,241,255,.86)',4);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,d?'rgba(196,232,255,.66)':'rgba(214,241,255,.72)');
         const lx=((sg.i*37)%100)/100*1.5-.75;poly(p1.x+p1.w*(lx-.05),p1.y,p1.x+p1.w*(lx+.03),p1.y,p2.x+p2.w*(lx+.13),p2.y,p2.x+p2.w*(lx+.05),p2.y,'rgba(255,255,255,.75)')}
       if(sg.fog>f0){ctx.globalAlpha=Math.min(th.vis?.97:.92,Math.pow((sg.fog-f0)/(1-f0),th.vis?1.1:1.6));ctx.fillStyle=th.fog;ctx.fillRect(-60,y2,vw+120,y1-y2);ctx.globalAlpha=1}
+      if(part)ctx.restore();
       maxy=y2;
     }
     if(LT&&(NT||th.pc))for(let n=0;n<DR;n++){const sg=SQ(n);if(sg.p1.c.z<=CAMD)continue;const so=SHX(n)/ROADW,zz=o=>mix(sg.p1.c.z,sg.p2.c.z,o.pct),pool=(x,z,r,w)=>{if(LT.np<16){const k=LT.np++*4;LT.P[k]=x;LT.P[k+1]=z;LT.P[k+2]=r;LT.P[k+3]=w}};
