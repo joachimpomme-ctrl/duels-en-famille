@@ -5429,9 +5429,10 @@ function padUI(){let box=document.getElementById('padui');
       +'#padui #pswap{align-self:center;padding:8px 14px;border-radius:999px;font-weight:700}#padui .pn{flex-basis:100%;margin:2px 0 0;font-size:13px;opacity:.75}';document.head.appendChild(st);
     box=document.createElement('div');box.id='padui';
     box.innerHTML=[0,1].map(i=>'<div class="pc" id="pc'+i+'"><b>Manette '+(i+1)+'</b><label>Joueur <select id="ph'+i+'" aria-label="Joueur qui tient la manette '+(i+1)+'"></select></label><em></em></div>').join('<button id="pswap" type="button">⇄ Échanger</button>')
-      +'<p class="pn">Chaque joueur garde sa manette d\'un match à l\'autre, qu\'il joue à gauche ou à droite.</p>';
+      +'<p class="pn">Chaque joueur garde sa manette d\'un match à l\'autre, qu\'il joue à gauche ou à droite. <a href="#" id="plog2" style="color:inherit">Journal des coupures</a></p>';
     host.parentNode.insertBefore(box,host.nextSibling);
     document.getElementById('pswap').onclick=()=>{const t=PSL[0];PSL[0]=PSL[1];PSL[1]=t;padKey='';try{SFX.click()}catch(e){}};
+    document.getElementById('plog2').onclick=e=>{e.preventDefault();PADLOG.open()};
     for(let i=0;i<2;i++)document.getElementById('ph'+i).onchange=function(){const h=padHolders(),v=this.value||null;if(v&&h[1-i]===v)h[1-i]=h[i];h[i]=v;cfg.ph=h;save();padKey='';this.blur()}}
   const now=performance.now(),S=[0,1].map(i=>{const s=PSL[i];return!s||s.lost>0?0:(s.act&&now-s.act<450?2:1)}),h=padHolders(),pl=cfg.players.filter(q=>q.on),
     key=S.join('')+(PSL[0]?PSL[0].idx:'-')+(PSL[1]?PSL[1].idx:'-')+'/'+h.join(',')+'/'+pl.map(q=>q.id+':'+q.n).join('|');
@@ -5449,6 +5450,71 @@ function padWatch(){const el=document.getElementById('padmsg');
   let e=el;if(!e){const pz=document.querySelector('#pause .actions');if(pz){e=document.createElement('p');e.id='padmsg';e.style.cssText='color:#ffd27a;font-weight:700;margin:0 0 14px;max-width:440px';pz.parentNode.insertBefore(e,pz)}}
   const hd=padHolders()[lost];if(e)e.textContent='La manette '+(lost+1)+(hd?', celle de '+nm(hd)+',':'')+' ne répond plus. Appuie sur un de ses boutons pour la réveiller, puis reprends la partie.';
   if(!paused)togglePause()}
+
+/* ================= journal des manettes : d'où viennent les coupures ? ================= */
+/* Il ne lit aucun bouton et ne change rien au jeu. Il écoute les annonces du navigateur (manette branchée, débranchée) et regarde, dix fois par seconde, quelles manettes sont là.
+   Deux familles de coupures : celles que le navigateur annonce (c'est matériel : hub, câble, manette) et celles où la manette disparaît sans annonce (c'est logiciel). */
+const PADLOG=(function(){
+  const KEY='duels_padlog',MAX=120,o={},st={};let L=[];
+  try{const v=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(v))L=v}catch(e){}
+  const keep=()=>{if(L.length>MAX)L=L.slice(-MAX);try{localStorage.setItem(KEY,JSON.stringify(L))}catch(e){}};
+  const slot=i=>{for(let k=0;k<2;k++)if(PSL[k]&&PSL[k].idx===i)return k;return-1};
+  const back=()=>{try{return document.hidden||!document.hasFocus()}catch(e){return false}};
+  for(const e of L)if(e.k==='c'&&e.d==null)e.d=-1;   /* coupure encore ouverte quand la page a été fermée : fin inconnue */
+  if(!L.length||L[L.length-1].k!=='s')L.push({k:'s',t:Date.now()});keep();
+  o.poll=function(){let gp=[];try{gp=navigator.getGamepads?navigator.getGamepads():[]}catch(e){}const now=Date.now(),here={};
+    for(let n=0;n<gp.length;n++){const g=gp[n];if(g&&g.connected!==false)here[g.index]=g}
+    for(const k in here){const s=st[k]||(st[k]={on:false,ev:0,cut:null,id:''});s.id=String(here[k].id||'').slice(0,70);
+      if(!s.on){s.on=true;if(s.cut){s.cut.d=now-s.cut.t;s.cut=null;keep();o.draw()}}}
+    for(const k in st){const s=st[k];if(!s.on||here[k])continue;s.on=false;
+      const c={k:'c',t:now,i:+k,sl:slot(+k),id:s.id,d:null,ev:now-s.ev<700?1:0,both:0,bg:back()?1:0,ph:typeof phase==='string'?phase:''};
+      for(const q in st)if(q!==k&&st[q].cut&&Math.abs(st[q].cut.t-now)<700){c.both=1;st[q].cut.both=1}
+      s.cut=c;L.push(c);keep();o.draw()}};
+  /* l'annonce du navigateur peut arriver un peu avant ou un peu après que la manette manque à l'appel */
+  addEventListener('gamepaddisconnected',e=>{const i=e.gamepad?e.gamepad.index:-1,s=st[i];if(!s)return;s.ev=Date.now();if(s.cut&&!s.cut.ev){s.cut.ev=1;keep();o.draw()}});
+  setInterval(o.poll,100);
+  const p2=n=>(n<10?'0':'')+n,day=t=>{const d=new Date(t);return p2(d.getDate())+'/'+p2(d.getMonth()+1)},hour=t=>{const d=new Date(t);return p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds())},
+    dur=e=>e.d==null?'en cours':e.d<0?'fin inconnue':e.d<950?'moins d\'une seconde':(e.d<9500?(e.d/1000).toFixed(1).replace('.',','):Math.round(e.d/1000))+' s',
+    who=e=>e.sl>=0?'Manette '+(e.sl+1):'Manette non attribuée',where=e=>e.ph==='play'?'en match':e.ph==='setup'?'à l\'accueil':'entre deux matchs';
+  o.cuts=()=>L.filter(e=>e.k==='c');
+  /* une coupure des deux manettes ensemble compte pour un seul incident */
+  o.inc=function(){const R=[];for(const e of o.cuts()){const p=R[R.length-1];if(e.both&&p&&p.both&&Math.abs(e.t-p.t)<700){p.ev=p.ev||e.ev;p.bg=p.bg||e.bg}else R.push({t:e.t,both:e.both,ev:e.ev,bg:e.bg})}return R};
+  o.count=function(){const C=o.inc(),n=C.length;return n?n+' coupure'+(n>1?'s':'')+' : '+C.filter(e=>e.both).length+' des deux manettes ensemble, '+C.filter(e=>!e.both).length+' d\'une seule. '+C.filter(e=>e.ev).length+' annoncée'+(C.filter(e=>e.ev).length>1?'s':'')+' par le navigateur, '+C.filter(e=>!e.ev).length+' sans annonce. '+C.filter(e=>e.bg).length+' avec la fenêtre en arrière-plan.':''};
+  /* ce que les chiffres permettent de dire, sans aller plus loin */
+  o.verdict=function(){const C=o.inc(),n=C.length;if(!n)return'Aucune coupure enregistrée pour l\'instant. Le journal tourne tout seul : joue, puis reviens ici après une coupure.';
+    const ev=C.filter(e=>e.ev).length,bo=C.filter(e=>e.both).length,bg=C.filter(e=>e.bg).length;
+    if(n<3)return'Pas encore assez de coupures pour conclure (il en faut au moins trois).';
+    if(bg>n*.6)return'La plupart des coupures arrivent quand la fenêtre du jeu n\'est plus au premier plan. Piste logicielle : une autre application ou une notification prend la main.';
+    if(ev>n*.6)return bo>n*.6?'Le navigateur annonce de vraies déconnexions, le plus souvent des deux manettes ensemble. La cause est en amont des manettes : le hub, sa prise ou le port de l\'ordinateur.'
+      :bo<n*.3?'Le navigateur annonce de vraies déconnexions, presque toujours d\'une seule manette. Regarde laquelle revient le plus souvent : son câble ou la manette elle-même.'
+      :'Le navigateur annonce de vraies déconnexions, tantôt d\'une manette, tantôt des deux. Il peut y avoir deux causes : le hub, et un câble.';
+    if(ev<n*.4)return'Les manettes disparaissent sans que le navigateur annonce de déconnexion. Piste logicielle : le navigateur ou le jeu, pas le matériel.';
+    return'Résultat partagé entre déconnexions annoncées et disparitions sans annonce : pas de conclusion nette.'};
+  o.text=function(){const now=Date.now(),out=['Journal des manettes · '+day(now)+' '+hour(now),o.count()||'Aucune coupure.',o.verdict(),''];
+    for(const e of L)out.push(e.k==='s'?'Page ouverte le '+day(e.t)+' à '+hour(e.t):day(e.t)+' '+hour(e.t)+' | '+who(e)+' (n° '+e.i+', '+(e.id||'modèle inconnu')+') | '+dur(e)+' | '+(e.ev?'annoncée':'sans annonce')+' | '+(e.both?'les deux ensemble':'seule')+' | '+where(e)+(e.bg?' | fenêtre en arrière-plan':''));
+    return out.join('\n')};
+  let box=null;
+  o.draw=function(){if(!box||box.style.display==='none')return;const rows=L.slice().reverse().slice(0,60).map(e=>e.k==='s'?'<tr class="ss"><td colspan="5">Page ouverte le '+day(e.t)+' à '+hour(e.t)+'</td></tr>'
+      :'<tr><td>'+day(e.t)+' '+hour(e.t)+'</td><td>'+who(e)+'</td><td>'+dur(e)+'</td><td>'+(e.ev?'annoncée par le navigateur':'<b>sans annonce</b>')+(e.bg?', fenêtre en arrière-plan':'')+'</td><td>'+(e.both?'les deux ensemble':'seule')+', '+where(e)+'</td></tr>').join('');
+    box.querySelector('.pv').textContent=o.verdict();
+    box.querySelector('.pc2').textContent=o.count();
+    box.querySelector('tbody').innerHTML=rows};
+  o.open=function(){if(!box){const stl=document.createElement('style');stl.textContent='#padlog{position:fixed;inset:0;z-index:60;background:rgba(6,7,18,.82);display:flex;align-items:center;justify-content:center;padding:18px}'
+        +'#padlog .pb{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px;max-width:860px;width:100%;max-height:88vh;display:flex;flex-direction:column;color:var(--txt);text-align:left}'
+        +'#padlog h3{margin:0 0 8px;font-size:21px}#padlog .pv{margin:0 0 6px;font-weight:700;color:#ffd27a;line-height:1.35}#padlog .pc2{margin:0 0 12px;color:var(--mut);font-size:14px}'
+        +'#padlog .pt{overflow:auto;border:1px solid var(--line);border-radius:10px;flex:1;min-height:90px}#padlog table{border-collapse:collapse;width:100%;font-size:13.5px}#padlog td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top}#padlog td:first-child{white-space:nowrap;color:var(--mut)}'
+        +'#padlog tr.ss td{color:var(--mut);background:rgba(255,255,255,.035);font-size:12.5px}#padlog .pa{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#padlog .pa span{align-self:center;color:var(--ok);font-size:13.5px}';document.head.appendChild(stl);
+      box=document.createElement('div');box.id='padlog';box.innerHTML='<div class="pb" role="dialog" aria-label="Journal des manettes"><h3>Journal des manettes</h3><p class="pv"></p><p class="pc2"></p><div class="pt"><table><tbody></tbody></table></div>'
+        +'<div class="pa"><button type="button" class="pk">Copier le journal</button><button type="button" class="pe">Effacer</button><button type="button" class="pf">Fermer</button><span></span></div></div>';document.body.appendChild(box);
+      const note=t=>{box.querySelector('.pa span').textContent=t};
+      box.querySelector('.pf').onclick=()=>{box.style.display='none'};box.addEventListener('click',e=>{if(e.target===box)box.style.display='none'});
+      box.querySelector('.pe').onclick=()=>{L=[{k:'s',t:Date.now()}];for(const k in st)st[k].cut=null;keep();note('Journal effacé.');o.draw()};
+      box.querySelector('.pk').onclick=()=>{const t=o.text(),ok=()=>note('Copié. Tu peux le coller où tu veux.'),old=()=>{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();let r=false;try{r=document.execCommand('copy')}catch(e){}a.remove();note(r?'Copié. Tu peux le coller où tu veux.':'Copie impossible ici : sélectionne le tableau à la main.')};
+        try{navigator.clipboard.writeText(t).then(ok,old)}catch(e){old()}}}
+    box.querySelector('.pa span').textContent='';box.style.display='flex';o.draw()};
+  try{const pz=document.querySelector('#pause .actions');if(pz){const b=document.createElement('button');b.id='plog';b.type='button';b.textContent='Journal des manettes';b.onclick=()=>o.open();pz.insertBefore(b,document.querySelector('#restart'))}
+    addEventListener('keydown',e=>{if(e.code==='Escape'&&box&&box.style.display!=='none'){box.style.display='none';e.stopImmediatePropagation()}},true)}catch(e){}
+  return o})();
 
 (function(){const sm0=startMatch,si0=showIntro,rp0=renderPick;
   startMatch=function(d,free){padAssign(d.a,d.b);sm0(d,free)};
