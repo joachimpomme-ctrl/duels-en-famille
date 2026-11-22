@@ -1852,9 +1852,9 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       const p1=sg.p1.s,p2=sg.p2.s;
       if(sg.p1.c.z<=CAMD||p2.y>=p1.y||p2.y>=maxy)continue;
       /* tronçon qui réapparaît derrière une crête : son bas est caché. On le coupe à la ligne de crête, sinon il repeint par-dessus la route déjà dessinée devant. */
-      const part=p1.y>maxy+.5&&maxy<vh+40,y1=Math.min(p1.y,maxy),y2=p2.y,d=sg.dk;
-      if(part){ctx.save();ctx.beginPath();ctx.rect(-90,-90,vw+180,maxy+90);ctx.clip()}
-      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20,sh/ROADW);if(part)ctx.cut(maxy);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
+      const cutp=p1.y>maxy+.5&&maxy<vh+40,y1=Math.min(p1.y,maxy),y2=p2.y,d=sg.dk;
+      if(cutp){ctx.save();ctx.beginPath();ctx.rect(-90,-90,vw+180,maxy+90);ctx.clip()}
+      if(TXR){ctx.seg(p1.x,p1.w,p1.y,p1.sc,p2.x,p2.w,p2.y,p2.sc,sg.i/20,(sg.i+1)/20,sh/ROADW);if(cutp)ctx.cut(maxy);ctx.ground(y1,th.g[d],th.gl||1)}else{ctx.fillStyle=th.g[d];ctx.fillRect(-60,y2,vw+120,y1-y2)}
       const r1=p1.w/7,r2=p2.w/7;
       if(!sg.dirt){poly(p1.x-p1.w-r1,p1.y,p1.x-p1.w,p1.y,p2.x-p2.w,p2.y,p2.x-p2.w-r2,p2.y,th.ru[d]);poly(p1.x+p1.w+r1,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x+p2.w+r2,p2.y,th.ru[d])}
       if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d],sg.dirt?2:0);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,sg.dirt?(d?'#7d5c3b':'#876541'):th.r[d]);
@@ -1873,7 +1873,7 @@ function itemIcon(k,x,y,r){ctx.save();ctx.translate(x,y);
       if(sg.ice){if(TXR)ctx.strip(-1,1,-1,1,0,1,0,1,d?'rgba(196,232,255,.82)':'rgba(214,241,255,.86)',4);else poly(p1.x-p1.w,p1.y,p1.x+p1.w,p1.y,p2.x+p2.w,p2.y,p2.x-p2.w,p2.y,d?'rgba(196,232,255,.66)':'rgba(214,241,255,.72)');
         const lx=((sg.i*37)%100)/100*1.5-.75;poly(p1.x+p1.w*(lx-.05),p1.y,p1.x+p1.w*(lx+.03),p1.y,p2.x+p2.w*(lx+.13),p2.y,p2.x+p2.w*(lx+.05),p2.y,'rgba(255,255,255,.75)')}
       if(sg.fog>f0){ctx.globalAlpha=Math.min(th.vis?.97:.92,Math.pow((sg.fog-f0)/(1-f0),th.vis?1.1:1.6));ctx.fillStyle=th.fog;ctx.fillRect(-60,y2,vw+120,y1-y2);ctx.globalAlpha=1}
-      if(part)ctx.restore();
+      if(cutp)ctx.restore();
       maxy=y2;
     }
     if(LT&&(NT||th.pc))for(let n=0;n<DR;n++){const sg=SQ(n);if(sg.p1.c.z<=CAMD)continue;const so=SHX(n)/ROADW,zz=o=>mix(sg.p1.c.z,sg.p2.c.z,o.pct),pool=(x,z,r,w)=>{if(LT.np<16){const k=LT.np++*4;LT.P[k]=x;LT.P[k+1]=z;LT.P[k+2]=r;LT.P[k+3]=w}};
@@ -4023,10 +4023,12 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
   DEFG.volley=true;cfg.games.volley=true;
 })();
 
-/* ================= ARTILLERIE : deux chars, un terrain qui se creuse, du vent, chacun son tour ================= */
+/* ================= ARTILLERIE : deux chars, un terrain qui se creuse, du vent, des caisses, chacun son tour ================= */
 (function(){
   const G0=520,WMAX=95,OL='#14100c',TURN=25,KS=1.35,HR=15*1.35,   /* KS : taille des chars ; HR : rayon touché par un obus */
-    WP=[{n:'Obus',r:36,d:45,am:99},{n:'Grappe',r:24,d:24,am:2},{n:'Gros calibre',r:62,d:62,am:1}],
+    FREE=70,RUN=380,MOT=5,BOX=3,   /* FREE : petit déplacement avant de tirer ; RUN : déplacement au moteur, à la place du tir ; BOX : une caisse tous les BOX tours */
+    WP=[{n:'Obus',r:36,d:45},{n:'Grappe',r:24,d:24},{n:'Gros calibre',r:62,d:62},{n:'Méga-bombe',r:90,d:85},{n:'Raid aérien',r:30,d:24},{n:'Moteur'}],
+    LOOT=[['pv',3],['mega',2],['raid',2],['obus',2],['bouclier',2]],
     TH=[{n:'Collines',sky:['#3d8fe0','#cfeaff'],far:'#8fc7a0',g:['#5aa648','#3f7a34'],top:'#8fd46a',sub:'#6b4a2c'},
       {n:'Désert',sky:['#f08a4b','#ffe2b0'],far:'#d9a066',g:['#d9a35a','#a8743a'],top:'#f2c57a',sub:'#7a4f28'},
       {n:'Banquise',sky:['#4f7fc8','#e4f3ff'],far:'#b9d3f0',g:['#e9f2fc','#a9c4e2'],top:'#ffffff',sub:'#6a86a8'}];
@@ -4044,12 +4046,43 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
     return best}
   function boom(s,x,y,k,own){const w=WP[k],R=w.r,h=s.h;
     for(let xx=Math.max(0,Math.floor(x-R));xx<=Math.min(W,Math.ceil(x+R));xx++){const dy=Math.sqrt(Math.max(0,R*R-(xx-x)*(xx-x)));if(h[xx]<y+dy&&h[xx]>y-dy-R)h[xx]=Math.min(H-10,Math.max(h[xx],y+dy))}
-    for(let j=0;j<2;j++){const t=s.p[j],d=Math.hypot(t.x-x,t.y-9*KS-y),dm=Math.round(w.d*(1+Math.max(0,s.tn-13)*.12)*clamp(1-(d-12)/(R*1.7),0,1));if(dm>0){t.hp=Math.max(0,t.hp-dm);t.fl=.5;t.dm={v:dm,t:1.3};s.n.hit++;if(j!==own)s.p[own].ok=1}}
+    for(let j=0;j<2;j++){const t=s.p[j],d=Math.hypot(t.x-x,t.y-9*KS-y);let dm=Math.round(w.d*(1+Math.max(0,s.tn-13)*.12)*clamp(1-(d-12)/(R*1.7),0,1));
+      if(dm>0&&t.shd&&j!==own){t.shu=true;t.fl=.3;t.msg={v:'Bloqué',t:1.6};tone(1250,.16,'triangle',.06,0,820);s.n.blk++;dm=0}
+      if(dm>0){t.hp=Math.max(0,t.hp-dm);t.fl=.5;t.dm={v:dm,t:1.3};s.n.hit++;if(j!==own)s.p[own].ok=1}}
+    /* une caisse prise dans l'explosion est perdue */
+    for(const c of s.cr)if(Math.hypot(c.x-x,c.y-11-y)<R*.5+6){c.gone=true;s.n.lost++;burst(c.x,c.y-11,12,170,.7,4,['#c98b4a','#a56e35','#e8c48a'],{g:520,drag:.6,sq:true})}
     s.ex.push({x,y,r:R,t:0});burst(x,y,Math.round(R*.7),R*7,.7,3.4,['#fff','#ffe45c',ORANGE,'#ff5a3d'],{add:true,drag:2.5});burst(x,y,Math.round(R*.5),R*5,.9,3,[TH[s.th].g[1],TH[s.th].sub,'rgba(60,50,40,.8)'],{g:520,drag:.6});
     SHK=Math.max(SHK,R*.22);if(R>50)SFX.crash();else{SFX.thud();fnoise(.35,.2,1800,120)}}
-  function fire(s,i,pw){const p=s.p[i],dir=i?-1:1,r=p.a*Math.PI/180,v=spd(pw);p.last={a:p.a,pw};p.rc=.22;p.am[p.wp]--;p.sn++;s.n.shots++;
+  function fire(s,i,pw){const p=s.p[i],dir=i?-1:1,r=p.a*Math.PI/180,v=spd(pw);p.last={a:p.a,pw};p.rc=.22;p.am[p.wp]--;p.sn++;p.cn++;s.n.shots++;
     s.sh.push({x:p.x+Math.cos(r)*22*KS*dir,y:p.y-14*KS-Math.sin(r)*22*KS,vx:Math.cos(r)*v*dir,vy:-Math.sin(r)*v,k:p.wp,own:i,tr:[],sub:false});
     if(p.am[p.wp]<=0)p.wp=0;s.ph='fly';s.chg=false;s.pt=0;SFX.fire();burst(p.x+Math.cos(r)*26*KS*dir,p.y-14*KS-Math.sin(r)*26*KS,10,160,.3,2.6,['#fff','#ffe45c','rgba(120,120,120,.7)'],{drag:3})}
+  /* la balise du raid est tombée : cinq bombes descendent du ciel, à la verticale, sans dériver au vent */
+  function raid(s,b){tone(820,.55,'sawtooth',.05,0,260);burst(b.x,Math.min(b.y,hAt(s,clamp(b.x,0,W))),14,150,.6,3,['#ff5a3d','#ffe45c','#fff'],{add:true,drag:2});
+    for(let j=0;j<5;j++)s.sh.push({x:clamp(b.x+(j-2)*36,-10,W+10),y:PY-30-((j*2)%5)*38,vx:0,vy:260,k:4,own:b.own,tr:[],sub:true,nw:true})}
+  /* fin d'un tour passé à rouler : pas de tir. Les repères de visée des deux chars ne valent plus. */
+  function endMove(s){const p=s.p[s.turn];if(p.go>40)for(const q of s.p)q.cn=0;s.n.runs++;s.ph='boom';s.pt=.35;s.chg=false}
+  const sel=(p,k)=>{if(p.wp===MOT)p.w0=k;else p.wp=k};
+  function take(s,j,c){const p=s.p[j];let k=LOOT[c.k][0],m;if(k==='pv'&&p.hp>=100)k='bouclier';
+    if(k==='pv'){const g=Math.min(40,100-p.hp);p.hp+=g;m='Réparation +'+g}
+    else if(k==='mega'){p.am[3]++;sel(p,3);m='Méga-bombe'}
+    else if(k==='raid'){p.am[4]++;sel(p,4);m='Raid aérien'}
+    else if(k==='obus'){p.am[2]++;p.am[1]++;sel(p,2);m='Gros calibre et grappe'}
+    else{p.shd=true;p.shu=false;m='Bouclier'}
+    /* attrapée en roulant au moteur : le tour n'est pas perdu, le char peut encore tirer, mais ne roule plus */
+    if(s.ph==='aim'&&j===s.turn&&s.com){s.com=false;p.run=0;p.fuel=0;if(p.go>40)for(const q of s.p)q.cn=0;p.wp=p.am[p.w0]>0?p.w0:0;s.tt=Math.max(s.tt,12);s.h3=2.6;s.n.free++}
+    p.msg={v:m,t:2.4};c.gone=true;s.n.box++;s.n.got[j]++;SFX.bonus();burst(c.x,c.y-11,16,170,.55,3.2,['#ffe45c','#fff','#c98b4a'],{drag:2})}
+  /* une caisse tombe entre les deux chars, plutôt du côté de celui qui ne joue pas : celui qui joue a la main, l'autre a le chemin le plus court */
+  function drop(s){if(s.tn<s.nd||s.cr.length>=2||window.ARTNOBOX)return;const A=s.p[s.turn],B=s.p[1-s.turn],lo=Math.min(A.x,B.x)+100,hi=Math.max(A.x,B.x)-100;if(hi-lo<30){s.nd=s.tn+1;return}
+    let x=0,ok=false;for(let n=0;n<12&&!ok;n++){x=clamp(A.x+(B.x-A.x)*(.5+Math.random()*.28),lo,hi);ok=s.cr.every(c=>Math.abs(c.x-x)>70)}if(!ok){s.nd=s.tn+1;return}
+    let t=Math.random()*LOOT.reduce((a,l)=>a+l[1],0),k=0;while(k<LOOT.length-1&&t>=LOOT[k][1]){t-=LOOT[k][1];k++}
+    s.cr.push({x:Math.round(x),y:PY-34,k,land:false,t:0,gone:false});s.nd=s.tn+BOX;s.n.drop++;tone(520,.12,'triangle',.05,0,780);tone(780,.16,'triangle',.05,.12,1040)}
+  function crate(c){ctx.save();ctx.translate(c.x,c.y);
+    if(!c.land){ctx.rotate(Math.sin(c.t*3)*.1);ctx.strokeStyle=OL;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-10,-23);ctx.lineTo(-24,-54);ctx.moveTo(10,-23);ctx.lineTo(24,-54);ctx.moveTo(0,-23);ctx.lineTo(0,-58);ctx.stroke();
+      ctx.fillStyle=OL;ctx.beginPath();ctx.arc(0,-54,27,Math.PI,0);ctx.closePath();ctx.fill();ctx.fillStyle='#ff5a5a';ctx.beginPath();ctx.arc(0,-54,25,Math.PI,0);ctx.closePath();ctx.fill();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,-54);ctx.arc(0,-54,25,Math.PI*1.34,Math.PI*1.66);ctx.closePath();ctx.fill()}
+    else glow(0,-11,26+3*Math.sin(c.t*4),'#ffe45c',.35);
+    ctx.fillStyle=OL;rr(ctx,-13,-24,26,24,4);ctx.fill();ctx.fillStyle='#c98b4a';rr(ctx,-11.5,-22.5,23,21,3);ctx.fill();ctx.fillStyle='#a56e35';ctx.fillRect(-11.5,-16,23,2.5);ctx.fillRect(-11.5,-9,23,2.5);
+    ctx.fillStyle='#e8c48a';ctx.fillRect(-11.5,-22.5,23,2);text('?',0,-11,15,OL);text('?',-.8,-11.8,15,'#fff');ctx.restore()}
   function tank(s,i){const p=s.p[i],c=COL[i],dk=shade(c,-.35),lt=shade(c,.4),dir=i?-1:1,dead=p.hp<=0,act=s.ph==='aim'&&s.turn===i;
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.tilt||0);ctx.scale(KS,KS);if(p.fl>0&&Math.floor(p.fl*20)%2)ctx.globalAlpha=.55;
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(0,1,20,4,0,0,7);ctx.fill();
@@ -4061,34 +4094,51 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
     ctx.fillStyle=OL;ctx.beginPath();ctx.arc(0,-16,9.5,Math.PI,0);ctx.fill();ctx.fillStyle=dead?'#666':c;ctx.beginPath();ctx.arc(0,-16,8,Math.PI,0);ctx.fill();ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(-3,-19,2.4,0,7);ctx.fill();
     ctx.restore();ctx.globalAlpha=1;
     if(dead){if(Math.random()<.4)part(p.x+(Math.random()-.5)*14,p.y-16,(Math.random()-.5)*20,-50-Math.random()*40,.9,4,'rgba(40,40,46,.7)',{grow:6});return}
+    if(p.shd){const y=p.y-13*KS,a=.75+.2*Math.sin(CLK*5);ctx.fillStyle='rgba(120,215,255,.16)';ctx.beginPath();ctx.arc(p.x,y,34,0,7);ctx.fill();ctx.globalAlpha=a;ctx.strokeStyle='#9be2ff';ctx.lineWidth=2.5;ctx.stroke();ctx.globalAlpha=1}
     /* points de vie */
     const bw=50,bx=p.x-bw/2,by=p.y-60;ctx.fillStyle=OL;rr(ctx,bx-2,by-2,bw+4,10,4);ctx.fill();ctx.fillStyle='#2a2f4a';rr(ctx,bx,by,bw,6,3);ctx.fill();ctx.fillStyle=p.hp>50?'#5be39a':p.hp>25?'#ffd23f':'#ff5a5a';if(p.hp>0){rr(ctx,bx,by,Math.max(5,bw*p.hp/100),6,3);ctx.fill()}
     if(p.dm&&p.dm.t>0)text('-'+p.dm.v,p.x,by-14-(1.3-p.dm.t)*18,17,'#ff8a7a');
+    if(p.msg&&p.msg.t>0){const x=clamp(p.x,80,W-80),y=by-34-(2.4-p.msg.t)*7;ctx.globalAlpha=Math.min(1,p.msg.t*2.5);text(p.msg.v,x+1,y+1.5,17,OL);text(p.msg.v,x,y,17,'#ffe45c');ctx.globalAlpha=1}
     if(act){const y=by-13+Math.sin(CLK*6)*2.5;ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(p.x-7,y-9);ctx.lineTo(p.x+7,y-9);ctx.lineTo(p.x,y);ctx.closePath();ctx.fill();ctx.strokeStyle=OL;ctx.lineWidth=1.5;ctx.stroke()}}
   GAMES.artil={name:'Artillerie',to:2,
-    keys:{d:'Haut et bas : angle du canon. Gauche et droite : déplacer le char',x:'Maintenir : la puissance monte. Relâcher : feu',b:'Changer d\'obus'},
-    rule:'Chacun tire à son tour. Règle l\'angle, maintiens le bouton principal pour faire monter la puissance, relâche pour tirer. Le vent change à chaque tour et dévie l\'obus. Les explosions creusent le terrain. Trois obus : le normal, la grappe qui se sépare en quatre (deux par manche) et le gros calibre (un par manche). Si la manche traîne, les obus font de plus en plus mal. Les pointillés montrent le départ de la trajectoire à la puissance de ton tir précédent, et une croix marque l\'endroit où il est tombé. Le char détruit perd la manche. À plusieurs : faites deux équipes et passez-vous la manette à chaque tir.',
+    keys:{d:'Haut et bas : angle du canon. Gauche et droite : déplacer le char',x:'Maintenir : la puissance monte. Relâcher : feu',b:'Changer d\'obus, ou choisir « Moteur » pour rouler loin sans tirer'},
+    rule:'Chacun joue à son tour : tirer, ou rouler. Des caisses tombent en parachute : roule dessus pour gagner une réparation, un bouclier, des obus spéciaux, une méga-bombe ou un raid aérien. Pour tirer, règle l\'angle, maintiens le bouton principal pour faire monter la puissance, relâche. Avant de tirer, le char peut avancer un peu. Pour aller loin, choisis « Moteur » avec l\'autre bouton : tu roules, mais tu ne tires pas ce tour, sauf si tu attrapes une caisse en chemin. Un obus qui tombe sur une caisse la détruit. Le bouclier arrête le prochain tir adverse qui te touche. Le vent change à chaque tour et dévie l\'obus. Les explosions creusent le terrain. Chaque manche commence avec deux grappes et un gros calibre. Si la manche traîne, les obus font de plus en plus mal. Les pointillés montrent le départ de la trajectoire à la puissance de ton tir précédent, et une croix marque l\'endroit où il est tombé. Le char détruit perd la manche. À plusieurs : faites deux équipes et passez-vous la manette à chaque tour.',
     reset(m){const s=m.S;for(const k in s)delete s[k];PT.length=0;m.pn=m.pn==null?0:m.pn+1;if(m.v0==null)m.v0=Math.random()*3|0;
-      Object.assign(s,{th:(m.v0+m.pn)%3,h:new Float32Array(W+1),t:0,ph:'aim',pt:0,tt:TURN,tn:0,turn:m.last===0?1:m.last===1?0:(Math.random()<.5?0:1),chg:false,pw:0,cd:1,wind:0,sh:[],ex:[],bb:null,n:{shots:0,hit:0},
-        p:[0,1].map(i=>({x:i?W-90-Math.random()*110:90+Math.random()*110,y:0,a:52,hp:100,fuel:70,wp:0,am:WP.map(w=>w.am),last:null,li:null,hold:0,rc:0,fl:0,dm:null,sn:0,ok:0,tilt:0}))});
+      Object.assign(s,{th:(m.v0+m.pn)%3,h:new Float32Array(W+1),t:0,ph:'aim',pt:0,tt:TURN,tn:0,turn:m.last===0?1:m.last===1?0:(Math.random()<.5?0:1),chg:false,com:false,pw:0,cd:1,wind:0,sh:[],ex:[],cr:[],nd:2,h1:0,h2:0,h3:0,bb:null,n:{shots:0,hit:0,box:0,drop:0,lost:0,runs:0,free:0,blk:0,got:[0,0]},
+        p:[0,1].map(i=>({x:i?W-90-Math.random()*110:90+Math.random()*110,y:0,a:52,hp:100,fuel:FREE,run:RUN,go:0,wp:0,w0:0,am:[99,2,1,0,0],last:null,li:null,hold:0,rc:0,fl:0,dm:null,msg:null,shd:false,shu:false,sn:0,cn:0,ok:0,tilt:0}))});
       land(s);s.wind=(Math.random()*2-1)*WMAX},
-    next(s){s.turn=1-s.turn;s.tn++;s.ph='aim';s.tt=TURN;s.chg=false;s.pw=0;s.p[s.turn].fuel=70;s.wind=clamp(s.wind+(Math.random()*2-1)*WMAX*.8,-WMAX,WMAX);SFX.click()},
-    update(m,dt){const s=m.S;s.t+=dt;
-      for(const p of s.p){const ty=Math.min(hAt(s,p.x-12),hAt(s,p.x),hAt(s,p.x+12));p.y=p.y<ty?Math.min(ty,p.y+300*dt):ty;p.tilt=Math.atan2(hAt(s,p.x+12)-hAt(s,p.x-12),24)*.8;p.rc-=dt;p.fl-=dt;if(p.dm)p.dm.t-=dt}
+    next(s){const q=s.p[s.turn];if(q.wp===MOT)q.wp=q.am[q.w0]>0?q.w0:0;
+      s.turn=1-s.turn;s.tn++;s.ph='aim';s.tt=TURN;s.chg=false;s.com=false;s.pw=0;const p=s.p[s.turn];p.fuel=FREE;p.run=RUN;p.go=0;p.w0=p.wp;if(p.shu){p.shd=false;p.shu=false}   /* w0 : l'obus en main au début du tour, repris après un passage par le moteur */
+      s.wind=clamp(s.wind+(Math.random()*2-1)*WMAX*.8,-WMAX,WMAX);SFX.click();drop(s)},
+    update(m,dt){const s=m.S;s.t+=dt;s.h1-=dt;s.h2-=dt;s.h3-=dt;
+      for(const p of s.p){const ty=Math.min(hAt(s,p.x-12),hAt(s,p.x),hAt(s,p.x+12));p.y=p.y<ty?Math.min(ty,p.y+300*dt):ty;p.tilt=Math.atan2(hAt(s,p.x+12)-hAt(s,p.x-12),24)*.8;p.rc-=dt;p.fl-=dt;if(p.dm)p.dm.t-=dt;if(p.msg)p.msg.t-=dt}
       for(const e of s.ex)e.t+=dt;s.ex=s.ex.filter(e=>e.t<.5);
-      if(s.ph==='aim'){const i=s.turn,p=s.p[i],I=inp[i];s.tt-=dt;
+      /* caisses : elles descendent, suivent le terrain qui se creuse, et vont au premier char qui les touche */
+      for(const c of s.cr){if(c.gone)continue;const ty=hAt(s,c.x);c.t+=dt;if(!c.land){c.y+=115*dt;if(c.y>=ty){c.y=ty;c.land=true;tone(150,.09,'sine',.07,0,90)}}else c.y=c.y<ty?Math.min(ty,c.y+300*dt):ty;
+        for(let j=0;j<2;j++){const t=s.p[j];if(t.hp>0&&Math.abs(t.x-c.x)<26&&c.y>t.y-42){take(s,j,c);break}}}
+      if(s.cr.some(c=>c.gone))s.cr=s.cr.filter(c=>!c.gone);
+      if(s.ph==='aim'){const i=s.turn,p=s.p[i],e=s.p[1-i],I=inp[i],mot=p.wp===MOT;s.tt-=dt;
         const ud=ax(I,'up','down');if(ud){p.hold+=dt;p.a=clamp(p.a+ud*(16+70*Math.min(1,p.hold/.7))*dt,4,176)}else p.hold=0;
-        const lr=ax(I,'right','left');if(lr&&p.fuel>0&&!s.chg){const nx=clamp(p.x+lr*46*dt,22,W-22);if(hAt(s,nx)>hAt(s,p.x)-.4-Math.abs(nx-p.x)*1.4){p.fuel-=Math.abs(nx-p.x);p.x=nx}}
-        if(I.p.b&&!s.chg){for(let k=1;k<=3;k++){const w=(p.wp+k)%3;if(p.am[w]>0){p.wp=w;break}}SFX.move()}
-        if(I.p.x&&!s.chg){s.chg=true;s.pw=0;s.cd=1}
-        if(s.chg){s.pw+=s.cd*dt/1.5;if(s.pw>=1){s.pw=1;s.cd=-1}else if(s.pw<=.03&&s.cd<0){s.pw=.03;s.cd=1}if(Math.random()<dt*14)tone(240+s.pw*620,.04,'square',.02);if(!I.x)fire(s,i,s.pw)}
-        else if(s.tt<=0)fire(s,i,p.last?p.last.pw:.5)}
+        const lr=ax(I,'right','left');
+        if(lr&&!s.chg){if(mot?p.run>0:p.fuel>0){
+            /* les chenilles passent partout, bords de cratère compris : la montée ralentit le char et lui coûte de l'essence */
+            const d0=(mot?120:46)*dt,up=Math.max(0,hAt(s,p.x)-hAt(s,p.x+lr*Math.max(1,d0)));let nx=clamp(p.x+lr*d0*d0/(d0+up*1.1),22,W-22);nx=i?Math.max(nx,e.x+46):Math.min(nx,e.x-46);   /* les chars ne se croisent pas */
+            const d=Math.abs(nx-p.x)*(1+up*1.1/d0);
+            if(nx!==p.x){if(mot){p.run-=d;p.go+=d;if(p.go>10)s.com=true;if(Math.random()<dt*26)part(p.x-lr*16,p.y-3,-lr*(20+Math.random()*30),-15-Math.random()*25,.45,3,'rgba(214,200,176,.6)',{grow:7});if(Math.random()<dt*9)tone(62+Math.random()*16,.07,'sawtooth',.018)}else p.fuel-=d;p.x=nx}}
+          else if(!mot)s.h2=1.8}
+        if(I.p.b&&!s.chg&&!s.com){const N=WP.length;for(let k=1;k<=N;k++){const w=(p.wp+k)%N;if(w===MOT?p.run>0:p.am[w]>0){p.wp=w;break}}SFX.move()}
+        if(I.p.x&&!s.chg){if(p.wp===MOT){if(s.com)endMove(s);else{s.h1=1.8;SFX.click()}}else{s.chg=true;s.pw=0;s.cd=1}}
+        if(s.ph==='aim'){
+          if(s.chg){s.pw+=s.cd*dt/1.5;if(s.pw>=1){s.pw=1;s.cd=-1}else if(s.pw<=.03&&s.cd<0){s.pw=.03;s.cd=1}if(Math.random()<dt*14)tone(240+s.pw*620,.04,'square',.02);if(!I.x)fire(s,i,s.pw)}
+          else if(s.com){if(p.run<=0||s.tt<=0)endMove(s)}
+          else if(s.tt<=0){if(p.wp===MOT)p.wp=p.am[p.w0]>0?p.w0:0;fire(s,i,p.last?p.last.pw:.5)}}}
       else if(s.ph==='fly'){const h=dt/3;
-        for(let q=0;q<3;q++)for(const b of s.sh.slice()){b.vy+=G0*h;b.vx+=s.wind*h;b.x+=b.vx*h;b.y+=b.vy*h;let hit=false;
+        for(let q=0;q<3;q++)for(const b of s.sh.slice()){b.vy+=G0*h;if(!b.nw)b.vx+=s.wind*h;b.x+=b.vx*h;b.y+=b.vy*h;let hit=false;
           if(b.k===1&&!b.sub&&b.vy>0){s.sh.splice(s.sh.indexOf(b),1);for(const o of[-95,-32,32,95])s.sh.push({x:b.x,y:b.y,vx:b.vx+o,vy:b.vy-20,k:1,own:b.own,tr:[],sub:true});tone(900,.08,'square',.05,0,400);continue}
           if(b.x<-80||b.x>W+80||b.y>H+60){s.sh.splice(s.sh.indexOf(b),1);continue}
           for(const t of s.p)if(Math.hypot(b.x-t.x,b.y-(t.y-9*KS))<HR)hit=true;
-          if(hit||(b.x>=0&&b.x<=W&&b.y>=hAt(s,b.x))){s.sh.splice(s.sh.indexOf(b),1);s.p[b.own].li={x:b.x,y:Math.min(b.y,hAt(s,clamp(b.x,0,W)))};boom(s,b.x,b.y,b.k,b.own)}}
+          if(hit||(b.x>=0&&b.x<=W&&b.y>=hAt(s,b.x))){s.sh.splice(s.sh.indexOf(b),1);if(!b.nw)s.p[b.own].li={x:b.x,y:Math.min(b.y,hAt(s,clamp(b.x,0,W)))};
+            if(b.k===4&&!b.sub)raid(s,b);else boom(s,b.x,b.y,b.k,b.own)}}
         for(const b of s.sh){b.tr.push(b.x,b.y);if(b.tr.length>40)b.tr.splice(0,2)}
         if(!s.sh.length){s.ph='boom';s.pt=.95}}
       else if(s.ph==='boom'){s.pt-=dt;if(s.pt<=0){const d0=s.p[0].hp<=0,d1=s.p[1].hp<=0;
@@ -4103,31 +4153,55 @@ const GRIDBG=layer(W,PH,g=>{const gr=g.createLinearGradient(0,0,0,PH);gr.addColo
       ctx.strokeStyle=T.top;ctx.lineWidth=5;ctx.lineJoin='round';ctx.beginPath();for(let x=0;x<=W;x+=3)x?ctx.lineTo(x,h[x]+1.5):ctx.moveTo(x,h[x]+1.5);ctx.stroke();ctx.strokeStyle='rgba(20,16,12,.55)';ctx.lineWidth=1.5;ctx.beginPath();for(let x=0;x<=W;x+=3)x?ctx.lineTo(x,h[x]-1):ctx.moveTo(x,h[x]-1);ctx.stroke();
       /* repères du tir précédent, visée */
       for(let i=0;i<2;i++){const li=s.p[i].li;if(li){ctx.strokeStyle=COL[i];ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(li.x-6,li.y-12);ctx.lineTo(li.x+6,li.y);ctx.moveTo(li.x+6,li.y-12);ctx.lineTo(li.x-6,li.y);ctx.stroke()}}
-      if(s.ph==='aim'){const i=s.turn,p=s.p[i],dir=i?-1:1,r=p.a*Math.PI/180,v=spd(s.chg?s.pw:p.last?p.last.pw:.5);let x=p.x+Math.cos(r)*22*KS*dir,y=p.y-14*KS-Math.sin(r)*22*KS,vx=Math.cos(r)*v*dir,vy=-Math.sin(r)*v;
+      if(s.ph==='aim'&&s.p[s.turn].wp!==MOT){const i=s.turn,p=s.p[i],dir=i?-1:1,r=p.a*Math.PI/180,v=spd(s.chg?s.pw:p.last?p.last.pw:.5);let x=p.x+Math.cos(r)*22*KS*dir,y=p.y-14*KS-Math.sin(r)*22*KS,vx=Math.cos(r)*v*dir,vy=-Math.sin(r)*v;
         for(let k=0;k<9;k++){for(let q=0;q<4;q++){vy+=G0/60;vx+=s.wind/60;x+=vx/60;y+=vy/60}ctx.globalAlpha=.85-k*.08;disc(x,y,4-k*.22,OL);disc(x,y,2.8-k*.22,'#fff')}ctx.globalAlpha=1}
+      for(const c of s.cr)crate(c);
       ptDraw(0);for(let i=0;i<2;i++)tank(s,i);
-      for(const b of s.sh){const n=b.tr.length/2;for(let q=0;q<n;q++){ctx.globalAlpha=q/n*.5;disc(b.tr[q*2],b.tr[q*2+1],1.5+2.5*q/n,'#fff')}ctx.globalAlpha=1;const z=b.k===2?7:b.sub?3.5:5;glow(b.x,b.y,z*3.5,ORANGE,.6);disc(b.x,b.y,z+1.6,OL);disc(b.x,b.y,z,b.k===2?'#ff5a3d':b.k===1?'#b48cff':'#ffe45c')}
+      for(const b of s.sh){if(b.y<PY+3)continue;const n=b.tr.length/2;for(let q=0;q<n;q++){if(b.tr[q*2+1]<PY+3)continue;ctx.globalAlpha=q/n*.5;disc(b.tr[q*2],b.tr[q*2+1],1.5+2.5*q/n,'#fff')}ctx.globalAlpha=1;
+        const z=b.k===3?9.5:b.k===2?7:b.k===1&&b.sub?3.5:5;glow(b.x,b.y,z*3.5,b.k===4&&!b.sub?'#ff5a3d':ORANGE,.6);disc(b.x,b.y,z+1.6,OL);disc(b.x,b.y,z,b.k===3?'#ff3d8a':b.k===2?'#ff5a3d':b.k===1?'#b48cff':b.k===4?(b.sub?'#3a3d4a':'#ff8a3d'):'#ffe45c')}
       for(const e of s.ex){const u=e.t/.5;glow(e.x,e.y,e.r*(1.2+u*1.6),'#ffe9a0',(1-u)*.9);ctx.globalAlpha=(1-u)*.8;ctx.strokeStyle='#fff';ctx.lineWidth=4*(1-u)+1;ctx.beginPath();ctx.arc(e.x,e.y,e.r*(.5+u*1.1),0,7);ctx.stroke();ctx.globalAlpha=1}
       ptDraw(1);ctx.restore();
       /* vent */
       {const w=s.wind/WMAX,x=W/2,y=PY+26;ctx.fillStyle='rgba(6,8,20,.72)';rr(ctx,x-92,y-15,184,30,15);ctx.fill();text('Vent',x-66,y+.5,13,'#c9cee8');ctx.fillStyle='#1c2140';rr(ctx,x-38,y-4,116,8,4);ctx.fill();
         ctx.fillStyle=Math.abs(w)>.6?ORANGE:'#6fd0ff';const L=56*Math.abs(w);if(L>2){ctx.fillRect(w>0?x+20:x+20-L,y-3,L,6);ctx.beginPath();const ex=x+20+56*w,sg=Math.sign(w);ctx.moveTo(ex+sg*9,y);ctx.lineTo(ex,y-8);ctx.lineTo(ex,y+8);ctx.closePath();ctx.fill()}ctx.fillStyle='#fff';ctx.fillRect(x+19,y-7,2,14)}
       /* joueurs : obus choisi, angle, puissance */
-      for(let i=0;i<2;i++){const p=s.p[i],act=s.ph==='aim'&&s.turn===i,x=i?W-250:14,y=H-22;ctx.globalAlpha=act?1:.6;ctx.fillStyle='rgba(6,8,20,.78)';rr(ctx,x,y-15,236,32,12);ctx.fill();if(act){ctx.strokeStyle=COL[i];ctx.lineWidth=2;ctx.stroke()}
-        text(WP[p.wp].n+(p.wp?' ×'+p.am[p.wp]:''),x+12,y+1,13,p.wp?'#ffe45c':'#fff','left');text(Math.round(p.a>90?180-p.a:p.a)+'°',x+132,y+1,14,'#fff','right');
-        ctx.fillStyle='#1c2140';rr(ctx,x+142,y-4,84,9,4);ctx.fill();const pw=act&&s.chg?s.pw:0;if(pw>0){ctx.fillStyle=pw>.85?'#ff5a3d':ORANGE;rr(ctx,x+142,y-4,Math.max(6,84*pw),9,4);ctx.fill()}
-        if(p.last){ctx.fillStyle='#fff';ctx.fillRect(x+142+84*p.last.pw-1,y-7,2,15)}ctx.globalAlpha=1}
-      if(s.ph==='aim'){const i=s.turn,p=s.p[i];if(s.t<1.6||s.tn&&s.tt>TURN-1.4){ctx.globalAlpha=Math.min(1,(s.tn?s.tt-(TURN-1.4):1.6-s.t)*3);text('À '+nm(i?M.b:M.a)+' de tirer',W/2,PY+66,22,COL[i]);ctx.globalAlpha=1}
+      for(let i=0;i<2;i++){const p=s.p[i],act=s.ph==='aim'&&s.turn===i,x=i?W-284:14,y=H-22,mot=p.wp===MOT;ctx.globalAlpha=act?1:.6;ctx.fillStyle='rgba(6,8,20,.78)';rr(ctx,x,y-15,270,32,12);ctx.fill();if(act){ctx.strokeStyle=COL[i];ctx.lineWidth=2;ctx.stroke()}
+        if(mot){text('Moteur',x+12,y+1,13,'#8fd8ff','left');text('rouler, sans tirer',x+258,y+1,12,'#c9cee8','right')}
+        else{text(WP[p.wp].n+(p.wp?' ×'+p.am[p.wp]:''),x+12,y+1,13,p.wp?'#ffe45c':'#fff','left');text(Math.round(p.a>90?180-p.a:p.a)+'°',x+166,y+1,14,'#fff','right');
+          ctx.fillStyle='#1c2140';rr(ctx,x+176,y-4,84,9,4);ctx.fill();const pw=act&&s.chg?s.pw:0;if(pw>0){ctx.fillStyle=pw>.85?'#ff5a3d':ORANGE;rr(ctx,x+176,y-4,Math.max(6,84*pw),9,4);ctx.fill()}
+          if(p.last){ctx.fillStyle='#fff';ctx.fillRect(x+176+84*p.last.pw-1,y-7,2,15)}}
+        /* bonus en réserve : une pastille par méga-bombe (rose) et par raid (orange) */
+        {let k=0;for(const[w,c]of[[3,'#ff3d8a'],[4,'#ff8a3d']])for(let n=0;n<Math.min(3,p.am[w]);n++){const px=i?x+260-k*13:x+10+k*13;disc(px,y-23,5.5,OL);disc(px,y-23,4,c);k++}}
+        ctx.globalAlpha=1}
+      if(s.ph==='aim'){const i=s.turn,p=s.p[i],mot=p.wp===MOT;if(s.t<1.6||s.tn&&s.tt>TURN-1.4){ctx.globalAlpha=Math.min(1,(s.tn?s.tt-(TURN-1.4):1.6-s.t)*3);text('À '+nm(i?M.b:M.a)+' de jouer',W/2,PY+66,22,COL[i]);ctx.globalAlpha=1}
         if(s.tt<10)text(Math.ceil(s.tt)+'',W/2,PY+66,26,s.tt<4?'#ff5a5a':'#fff');
         if(s.tn>13&&s.tt<TURN-1.5&&s.tt>=10)text('Mort subite : les obus font plus mal',W/2,PY+62,15,'#ff8a7a');
-        if(p.fuel<70&&p.fuel>0){ctx.fillStyle='rgba(6,8,20,.6)';rr(ctx,p.x-22,p.y+8,44,7,3);ctx.fill();ctx.fillStyle='#8fd8ff';rr(ctx,p.x-21,p.y+9,Math.max(3,42*p.fuel/70),5,2.5);ctx.fill()}}
+        const hint=s.h3>0?'Caisse attrapée : tu peux encore tirer':s.com?'Bouton principal : fin du tour':mot?(s.h1>0?'Roule d\'abord, avec gauche ou droite':'Gauche ou droite pour rouler loin. Pas de tir ce tour, sauf si tu attrapes une caisse.'):s.h2>0?'Pour aller plus loin : choisis « Moteur » avec l\'autre bouton':'';
+        if(hint&&(s.tt<TURN-1.5||s.h3>0)){const y=PY+94,w=hint.length*7.4+26;ctx.fillStyle='rgba(6,8,20,.72)';rr(ctx,W/2-w/2,y-13,w,26,13);ctx.fill();text(hint,W/2,y+.5,14,'#8fd8ff')}
+        if(mot){ctx.fillStyle='rgba(6,8,20,.7)';rr(ctx,p.x-32,p.y+8,64,8,4);ctx.fill();if(p.run>0){ctx.fillStyle=ORANGE;rr(ctx,p.x-31,p.y+9,Math.max(3,62*p.run/RUN),6,3);ctx.fill()}}
+        else if(p.fuel<FREE&&p.fuel>0){ctx.fillStyle='rgba(6,8,20,.6)';rr(ctx,p.x-22,p.y+8,44,7,3);ctx.fill();ctx.fillStyle='#8fd8ff';rr(ctx,p.x-21,p.y+9,Math.max(3,42*p.fuel/FREE),5,2.5);ctx.fill()}}
       text(TH[s.th].n,W/2,H-21,12,'rgba(230,236,255,.8)')},
-    /* l'ordi cherche l'angle et la puissance qui tombent le plus près, puis se trompe plus ou moins selon son niveau. Il se règle au fil de ses tirs. */
-    bot(m,i){const s=m.S,o={};if(s.ph!=='aim'||s.turn!==i)return o;const p=s.p[i],lv=cfg.cpu,B=s.bb||(s.bb={n:-1});
-      if(B.n!==s.tn){B.n=s.tn;const q=solve(s,i),k=Math.pow([.9,.8,.65][lv],p.sn);B.a=clamp(q.a+g3()*[12,7,3][lv]*k,10,86);B.pw=clamp(q.pw+g3()*[.15,.09,.04][lv]*k,.1,1);B.w=.7+Math.random()*.7;B.f=0;
-        B.wp=lv&&p.sn>=1&&p.ok&&p.am[2]>0?2:lv&&p.sn>=2&&p.am[1]>0&&Math.random()<.5?1:0}
+    /* l'ordi : s'il y a une caisse à sa portée, il pèse s'il va la chercher (et y laisse son tir quand elle est loin). Sinon il cherche l'angle et la puissance qui tombent le plus près, puis se trompe plus ou moins selon son niveau. Il se règle au fil de ses tirs, et repart de zéro quand un char a roulé. */
+    bot(m,i){const s=m.S,o={};if(s.ph!=='aim'||s.turn!==i)return o;const p=s.p[i],e=s.p[1-i],lv=cfg.cpu,B=s.bb||(s.bb={n:-1});
+      if(B.n!==s.tn){B.n=s.tn;B.w=.7+Math.random()*.7;B.f=0;B.q=false;B.go=null;B.st=0;B.px=p.x;
+        if(!(window.ARTNOMOVE&&window.ARTNOMOVE[i])){let c=null,bd=1e9;for(const q of s.cr){const d=Math.abs(q.x-p.x);if((e.x-p.x)*(q.x-p.x)>0&&d>Math.abs(e.x-p.x)-50)continue;if(d<bd){bd=d;c=q}}
+          if(c){const kill=lv>0&&e.hp<=30&&p.cn>=1||lv>1&&p.cn>=2&&p.hp>e.hp,R=Math.random();   /* il préfère tirer quand il peut achever, ou qu'il mène et qu'il est réglé */
+            if(bd<=FREE+18){if(R<[.6,.9,1][lv])B.go={c,free:true}}
+            else if(kill){}
+            else if(bd<=RUN+18){if(R<[.3,.6,.85][lv])B.go={c}}
+            else if(bd<=RUN*2&&bd<Math.abs(c.x-e.x)){if(R<[.1,.25,.4][lv])B.go={c}}}}}
       B.w-=1/60;B.f++;if(B.w>0)return o;
+      if(B.go){const c=B.go.c,gone=s.cr.indexOf(c)<0,dk=c.x>p.x?'right':'left';
+        if(B.mv&&Math.abs(p.x-B.px)<.2)B.st++;else B.st=0;B.px=p.x;B.mv=false;   /* B.st : images passées à pousser sans avancer (pente trop raide, autre char) */
+        if(B.go.free){if(gone||p.fuel<=0||B.st>40)B.go=null;else{o[dk]=true;B.mv=true;return o}}
+        else if(!s.com&&(gone||B.st>40))B.go=null;
+        else{if(p.wp!==MOT){if(B.f%8===0)o.b=true;return o}
+          if(gone||p.run<=0||B.st>40){if(B.f%6===0)o.x=true;return o}
+          o[dk]=true;B.mv=true;return o}}
+      if(!B.q){B.q=true;const q=solve(s,i),k=Math.pow([.9,.8,.65][lv],p.cn),D=Math.abs(e.x-p.x);B.a=clamp(q.a+g3()*[12,7,3][lv]*k,10,86);B.pw=clamp(q.pw+g3()*[.15,.09,.04][lv]*k,.1,1);
+        B.wp=lv&&e.shd?0:p.am[3]>0&&D>220&&(!lv||p.cn>=1)?3:p.am[4]>0&&(!lv||p.cn>=1)?4:lv&&p.cn>=1&&p.ok&&p.am[2]>0&&D>150?2:lv&&p.cn>=2&&p.am[1]>0&&Math.random()<.5?1:0}   /* contre un bouclier : un obus simple, pour ne rien gâcher */
       if(!s.chg){if(p.wp!==B.wp&&p.am[B.wp]>0){if(B.f%8===0)o.b=true;return o}
+        if(p.wp===MOT){if(B.f%8===0)o.b=true;return o}
         const da=B.a-p.a;if(Math.abs(da)>.9){if(Math.abs(da)>5||B.f%2)o[da>0?'up':'down']=true;return o}
         o.x=true;return o}
       if(s.cd>0&&s.pw<B.pw)o.x=true;
